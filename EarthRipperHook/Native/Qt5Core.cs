@@ -3,7 +3,7 @@ using Reloaded.Memory.Sources;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace EarthRipperHook.Hooks
+namespace EarthRipperHook.Native
 {
     [FunctionLibrary("Qt5Core.dll")]
     internal static class Qt5Core
@@ -19,8 +19,8 @@ namespace EarthRipperHook.Hooks
                 public uint Offset;
             }
 
-            private readonly nuint _nativeQStringData;
-            private readonly bool _isNativelyAllocated;
+            internal nuint NativeQStringData { get; }
+            internal bool IsNativelyAllocated { get; }
 
             public QString(nuint nativeQStringData, int levelsOfIndirection = 0)
             {
@@ -30,8 +30,8 @@ namespace EarthRipperHook.Hooks
                     Memory.CurrentProcess.Read(address, out address);
                 }
 
-                _nativeQStringData = address;
-                _isNativelyAllocated = true;
+                NativeQStringData = address;
+                IsNativelyAllocated = true;
             }
 
             public QString(string value)
@@ -47,36 +47,36 @@ namespace EarthRipperHook.Hooks
                 byte[] bytes =
                 [
                     .. Struct.GetBytes(header),
-                .. Encoding.Unicode.GetBytes(value),
-                .. Encoding.Unicode.GetBytes("\0"),
-            ];
+                    .. Encoding.Unicode.GetBytes(value),
+                    .. Encoding.Unicode.GetBytes("\0"),
+                ];
 
-                _nativeQStringData = Memory.CurrentProcess.Allocate(bytes.Length);
-                Memory.CurrentProcess.WriteRaw(_nativeQStringData, bytes);
+                NativeQStringData = Memory.CurrentProcess.Allocate(bytes.Length);
+                Memory.CurrentProcess.WriteRaw(NativeQStringData, bytes);
             }
 
             public void Dispose()
             {
-                if (_nativeQStringData != 0x0 && !_isNativelyAllocated)
+                if (NativeQStringData != 0x0 && !IsNativelyAllocated)
                 {
-                    Memory.CurrentProcess.Free(_nativeQStringData);
+                    Memory.CurrentProcess.Free(NativeQStringData);
                 }
             }
 
             public override string ToString()
             {
-                if (_nativeQStringData == 0x0)
+                if (NativeQStringData == 0x0)
                 {
                     Log.Warning("Attempting to read null QString");
                     return string.Empty;
                 }
 
-                Struct.FromPtr(_nativeQStringData, out QStringDataHeader header);
+                Struct.FromPtr(NativeQStringData, out QStringDataHeader header);
 
                 if (header.ReferenceCount < -1 || header.Size < 0 || header.Offset != 16)
                 {
                     Log.Warning(
-                        $"Unexpected QString header contents at {_nativeQStringData}:",
+                        $"Unexpected QString header contents at {NativeQStringData}:",
                         $"  ReferenceCount = {header.ReferenceCount}:",
                         $"  Size           = {header.Size}:",
                         $"  Allocated      = {header.Allocated}:",
@@ -85,7 +85,7 @@ namespace EarthRipperHook.Hooks
                     return string.Empty;
                 }
 
-                Memory.CurrentProcess.ReadRaw(_nativeQStringData + 16, out byte[] bytes, header.Size * 2);
+                Memory.CurrentProcess.ReadRaw(NativeQStringData + 16, out byte[] bytes, header.Size * 2);
                 return Encoding.Unicode.GetString(bytes);
             }
         }

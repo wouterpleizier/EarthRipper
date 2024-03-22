@@ -4,22 +4,23 @@ using System.Reflection;
 
 namespace EarthRipperHook
 {
-    internal static class HookProxy<THookDelegate> where THookDelegate : Delegate
+    internal static class NativeDelegateProxy<TNativeDelegate> where TNativeDelegate : Delegate
     {
-        internal static THookDelegate OriginalFunction { get; }
+        internal static TNativeDelegate OriginalFunction { get; }
 
         private static readonly object _lock;
         private static readonly Type _returnType;
-        private static readonly THookDelegate _hookHandler;
-        private static readonly List<THookDelegate> _subscribers;
+
+        private static readonly TNativeDelegate _hookHandler;
+        private static readonly Dictionary<HookToken<TNativeDelegate>, TNativeDelegate> _subscribers;
+        private static (HookToken<TNativeDelegate> Token, TNativeDelegate Subscriber)? _exclusiveSubscriber;
+
         private static readonly ThreadLocal<Stack<DispatchContext>> _dispatchContextStack;
-
         private static int _dispatchContextVersion;
-        private static THookDelegate? _exclusiveSubscriber;
 
-        static HookProxy()
+        static NativeDelegateProxy()
         {
-            Type delegateType = typeof(THookDelegate);
+            Type delegateType = typeof(TNativeDelegate);
 
             if (delegateType.GetCustomAttribute<X86FunctionAttribute>() == null
                 && delegateType.GetCustomAttribute<X64FunctionAttribute>() == null)
@@ -60,7 +61,7 @@ namespace EarthRipperHook
                 .Select(param => param.ParameterType)
                 .ToArray();
 
-            MethodInfo genericHandlerMethod = typeof(HookProxy<THookDelegate>)
+            MethodInfo genericHandlerMethod = typeof(NativeDelegateProxy<TNativeDelegate>)
                 .GetMethods(BindingFlags.Static | BindingFlags.NonPublic)
                 .Single
                 (
@@ -73,10 +74,10 @@ namespace EarthRipperHook
                 ? [.. delegateParameterTypes]
                 : [.. delegateParameterTypes, _returnType]);
 
-            _hookHandler = handlerMethod.CreateDelegate<THookDelegate>();
+            _hookHandler = handlerMethod.CreateDelegate<TNativeDelegate>();
             long address = (long)HookUtil.GetProcAddress(functionLibraryAttribute.Library, functionNameAttribute.Name);
 
-            IHook<THookDelegate> hook = ReloadedHooks.Instance.CreateHook(_hookHandler, address);
+            IHook<TNativeDelegate> hook = ReloadedHooks.Instance.CreateHook(_hookHandler, address);
 
             OriginalFunction = hook.OriginalFunction;
             _lock = new object();
@@ -86,94 +87,80 @@ namespace EarthRipperHook
             hook.Activate();
         }
 
-        internal static bool Subscribe(THookDelegate subscriber)
+        internal static void EnsureInitialized()
+        {
+            // No need to do anything here besides letting the static constructor run.
+        }
+
+        internal static HookToken<TNativeDelegate>? Hook(TNativeDelegate subscriber, bool exclusive = false, bool throwOnFailure = false)
         {
             lock (_lock)
             {
-                if (!_subscribers.Contains(subscriber))
+                if (exclusive)
                 {
-                    _subscribers.Add(subscriber);
-                    _dispatchContextVersion++;
-                    return true;
+                    if (_exclusiveSubscriber == null)
+                    {
+                        var token = new HookToken<TNativeDelegate>(token => Unhook((HookToken<TNativeDelegate>)token));
+
+                        _exclusiveSubscriber = (token, subscriber);
+                        _dispatchContextVersion++;
+                        return token;
+                    }
+                    else if (throwOnFailure)
+                    {
+                        throw new InvalidOperationException($"Exclusive access to {typeof(TNativeDelegate)} is already held by another subscriber");
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
                 else
                 {
-                    return false;
+                    if (!_subscribers.ContainsValue(subscriber))
+                    {
+                        var token = new HookToken<TNativeDelegate>(token => Unhook((HookToken<TNativeDelegate>)token));
+
+                        _subscribers.Add(token, subscriber);
+                        _dispatchContextVersion++;
+                        return token;
+                    }
+                    else if (throwOnFailure)
+                    {
+                        throw new InvalidOperationException($"Shared access to {typeof(TNativeDelegate)} is already held by specified subscriber");
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
             }
         }
 
-        internal static bool Unsubscribe(THookDelegate subscriber)
+        internal static void Unhook(HookToken<TNativeDelegate> token, bool throwOnFailure = false)
         {
             lock (_lock)
             {
-                if (_subscribers.Remove(subscriber))
-                {
-                    _dispatchContextVersion++;
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        internal static bool RequestExclusiveAccess(THookDelegate subscriber)
-        {
-            lock (_lock)
-            {
-                if (_exclusiveSubscriber == null)
-                {
-                    _exclusiveSubscriber = subscriber;
-                    _dispatchContextVersion++;
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        internal static bool TransferExclusiveAccess(THookDelegate fromSubscriber, THookDelegate toSubscriber)
-        {
-            lock (_lock)
-            {
-                if (fromSubscriber != null && toSubscriber != null && _exclusiveSubscriber == fromSubscriber)
-                {
-                    _exclusiveSubscriber = toSubscriber;
-                    _dispatchContextVersion++;
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        internal static bool ReleaseExclusiveAccess(THookDelegate subscriber)
-        {
-            lock (_lock)
-            {
-                if (_exclusiveSubscriber == subscriber)
+                if (_exclusiveSubscriber?.Token == token)
                 {
                     _exclusiveSubscriber = null;
                     _dispatchContextVersion++;
-                    return true;
                 }
-                else
+                else if (_subscribers.Remove(token))
                 {
-                    return false;
+                    _dispatchContextVersion++;
+                }
+                else if (throwOnFailure)
+                {
+                    throw new InvalidOperationException($"Specified token has no corresponding subscriber to {typeof(TNativeDelegate)}");
                 }
             }
         }
 
         internal static bool SuppressOriginal(object? returnValue = null)
         {
-            if ((_returnType == typeof(void) && returnValue != null)
-                || (_returnType != typeof(void) && returnValue?.GetType() != _returnType))
+            if (_returnType == typeof(void) && returnValue != null
+                || _returnType != typeof(void) && returnValue?.GetType() != _returnType)
             {
                 throw new ArgumentException("Return value must match delegate");
             }
@@ -226,18 +213,18 @@ namespace EarthRipperHook
 
         private static object? Dispatch(params object?[] args)
         {
-            HookProxy<THookDelegate>.DispatchContext context = PushDispatchContext();
+            NativeDelegateProxy<TNativeDelegate>.DispatchContext context = PushDispatchContext();
             try
             {
                 object? result = null;
 
-                Queue<THookDelegate> queuedSubscribers = new Queue<THookDelegate>(context.Subscribers);
+                Queue<TNativeDelegate> queuedSubscribers = new Queue<TNativeDelegate>(context.Subscribers);
                 if (queuedSubscribers.Count > 0)
                 {
-                    List<THookDelegate> handledSubscribers = [];
+                    List<TNativeDelegate> handledSubscribers = [];
                     while (queuedSubscribers.Count > 0)
                     {
-                        THookDelegate queuedSubscriber = queuedSubscribers.Dequeue();
+                        TNativeDelegate queuedSubscriber = queuedSubscribers.Dequeue();
 
                         // Should probably use expressions or some other magic here, but this is fast enough for now.
                         queuedSubscriber.DynamicInvoke(args);
@@ -246,7 +233,7 @@ namespace EarthRipperHook
 
                         if (SyncDispatchContext(context))
                         {
-                            queuedSubscribers = new Queue<THookDelegate>(context.Subscribers.Except(handledSubscribers));
+                            queuedSubscribers = new Queue<TNativeDelegate>(context.Subscribers.Except(handledSubscribers));
                         }
                     }
                 }
@@ -279,7 +266,7 @@ namespace EarthRipperHook
         private class DispatchContext
         {
             internal int Version { get; set; }
-            internal List<THookDelegate> Subscribers { get; set; } = [];
+            internal List<TNativeDelegate> Subscribers { get; set; } = [];
             internal Queue<Action> PostCompletionActions { get; set; } = [];
             internal bool SuppressOriginalFunction { get; set; }
             internal object? OverrideReturnValue { get; set; }
@@ -317,7 +304,10 @@ namespace EarthRipperHook
                 if (dispatchContext.Version != _dispatchContextVersion)
                 {
                     dispatchContext.Version = _dispatchContextVersion;
-                    dispatchContext.Subscribers = new List<THookDelegate>(_exclusiveSubscriber != null ? [_exclusiveSubscriber] : _subscribers);
+                    dispatchContext.Subscribers = _exclusiveSubscriber != null
+                        ? [_exclusiveSubscriber.Value.Subscriber]
+                        : [.. _subscribers.Values];
+
                     return true;
                 }
                 else

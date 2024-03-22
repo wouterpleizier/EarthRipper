@@ -1,0 +1,6 @@
+﻿{
+  "Path": "{Directory}/{FileName}.elevation",
+  "Format": "PNG_Gray16",
+  "AllowImageOverlays": false,
+  "DefaultShaderHandling": "BlockAll",
+}
