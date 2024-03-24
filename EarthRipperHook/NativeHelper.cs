@@ -1,19 +1,18 @@
 ﻿using Reloaded.Hooks;
-using Reloaded.Hooks.Definitions;
-using Reloaded.Hooks.Definitions.X86;
 using System.Diagnostics;
 
 namespace EarthRipperHook
 {
-    internal static class HookUtil
+    internal static class NativeHelper
     {
-        [Function(CallingConventions.Stdcall)]
+        [X86Function(X86CallingConventions.Stdcall)]
+        [X64Function(X64CallingConventions.Microsoft)]
         private delegate nuint GetProcAddressDelegate(nuint module, string procName);
         private static GetProcAddressDelegate _getProcAddressFunc;
 
         private static readonly Dictionary<string, nuint> _moduleAddresses;
 
-        static HookUtil()
+        static NativeHelper()
         {
             _getProcAddressFunc = (_, _) => throw new InvalidOperationException();
             _moduleAddresses = [];
@@ -44,15 +43,6 @@ namespace EarthRipperHook
         {
             nuint module = GetModuleAddress(moduleName);
             return _getProcAddressFunc.Invoke(module, procName);
-        }
-
-        internal static IHook<TFunction> CreateHook<TFunction>(string moduleName, string procName, TFunction function)
-        {
-            nuint procAddress = GetProcAddress(moduleName, procName);
-            IHook<TFunction> result = ReloadedHooks.Instance.CreateHook(function, (long)procAddress);
-            result.Activate();
-
-            return result;
         }
     }
 }

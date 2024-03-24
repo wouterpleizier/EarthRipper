@@ -23,7 +23,7 @@ namespace EarthRipperHook
             }
 
             Log.Initialize(LogUtil.GetSharedLogName(args.InjectorProcessID));
-            HookUtil.Initialize(args.GetProcAddressAddress);
+            NativeHelper.Initialize(args.GetProcAddressAddress);
             ShaderHelper.Initialize();
 
             _captureHook = new CaptureHook();

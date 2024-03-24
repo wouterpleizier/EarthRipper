@@ -75,7 +75,7 @@ namespace EarthRipperHook
                 : [.. delegateParameterTypes, _returnType]);
 
             _hookHandler = handlerMethod.CreateDelegate<TNativeDelegate>();
-            long address = (long)HookUtil.GetProcAddress(functionLibraryAttribute.Library, functionNameAttribute.Name);
+            long address = (long)NativeHelper.GetProcAddress(functionLibraryAttribute.Library, functionNameAttribute.Name);
 
             IHook<TNativeDelegate> hook = ReloadedHooks.Instance.CreateHook(_hookHandler, address);
 
