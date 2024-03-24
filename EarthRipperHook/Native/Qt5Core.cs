@@ -19,24 +19,28 @@ namespace EarthRipperHook.Native
                 public uint Offset;
             }
 
+            internal nuint NativeQString { get; }
             internal nuint NativeQStringData { get; }
             internal bool IsNativelyAllocated { get; }
 
-            public QString(nuint nativeQStringData, int levelsOfIndirection = 0)
+            public QString(nuint address, int levelsOfIndirection = 1)
             {
-                nuint address = nativeQStringData;
+                nuint qString = nuint.Zero;
+                nuint qStringData = address;
                 for (int i = 0; i < levelsOfIndirection; i++)
                 {
-                    Memory.CurrentProcess.Read(address, out address);
+                    qString = qStringData;
+                    Memory.CurrentProcess.Read(qString, out qStringData);
                 }
 
-                NativeQStringData = address;
+                NativeQString = qString;
+                NativeQStringData = qStringData;
                 IsNativelyAllocated = true;
             }
 
             public QString(string value)
             {
-                QStringDataHeader header = new()
+                QStringDataHeader qStringDataHeader = new()
                 {
                     ReferenceCount = -1,                  // -1 so Qt never frees this memory
                     Size = value.Length,                  // Number of characters
@@ -44,22 +48,37 @@ namespace EarthRipperHook.Native
                     Offset = 16                           // String data offset relative to start of header; always 16
                 };
 
-                byte[] bytes =
+                byte[] qStringData =
                 [
-                    .. Struct.GetBytes(header),
+                    .. Struct.GetBytes(qStringDataHeader),
                     .. Encoding.Unicode.GetBytes(value),
                     .. Encoding.Unicode.GetBytes("\0"),
                 ];
 
-                NativeQStringData = Memory.CurrentProcess.Allocate(bytes.Length);
-                Memory.CurrentProcess.WriteRaw(NativeQStringData, bytes);
+                NativeQStringData = Memory.CurrentProcess.Allocate(qStringData.Length);
+                Memory.CurrentProcess.WriteRaw(NativeQStringData, qStringData);
+
+                byte[] qString = nuint.Size == 4
+                    ? BitConverter.GetBytes((uint)NativeQStringData)
+                    : BitConverter.GetBytes(NativeQStringData);
+
+                NativeQString = Memory.CurrentProcess.Allocate(qString.Length);
+                Memory.CurrentProcess.WriteRaw(NativeQString, qString);
             }
 
             public void Dispose()
             {
-                if (NativeQStringData != 0x0 && !IsNativelyAllocated)
+                if (!IsNativelyAllocated)
                 {
-                    Memory.CurrentProcess.Free(NativeQStringData);
+                    if (NativeQStringData != nuint.Zero)
+                    {
+                        Memory.CurrentProcess.Free(NativeQStringData);
+                    }
+
+                    if (NativeQString != nuint.Zero)
+                    {
+                        Memory.CurrentProcess.Free(NativeQString);
+                    }
                 }
             }
 

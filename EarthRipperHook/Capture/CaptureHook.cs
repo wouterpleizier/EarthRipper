@@ -52,13 +52,13 @@ namespace EarthRipperHook.Capture
             nuint InvokeOriginalAndGetCaptureQueue(nuint result, nuint parentWidget, nuint caption, nuint dir, nuint filter, nuint selectedFilter)
             {
                 // Filters are localized, but we can always count on the extensions being present.
-                string filterAsString = new QString(filter, 1).ToString();
+                string filterAsString = new QString(filter).ToString();
                 if (filterAsString.Contains("*.jpg") && filterAsString.Contains("*.png"))
                 {
                     nuint path = Original<QFileDialog.GetSaveFileName>()(result, parentWidget, caption, dir, filter, selectedFilter);
                     SuppressOriginal<QFileDialog.GetSaveFileName>(path);
 
-                    string saveImagePath = new QString(path, 1).ToString();
+                    string saveImagePath = new QString(path).ToString();
                     queuedCaptures = new Queue<CaptureTask>(GetCaptureTasks(saveImagePath));
                 }
 

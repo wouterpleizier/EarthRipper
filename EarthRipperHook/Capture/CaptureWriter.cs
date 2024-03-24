@@ -23,7 +23,7 @@ namespace EarthRipperHook.Capture
 
         private static bool Write16BitGrayscalePNG(nuint qImage, nuint fileName)
         {
-            string path = new QString(fileName, 1).ToString();
+            string path = new QString(fileName).ToString();
             int width = Original<QImage.Width>()(qImage);
             int height = Original<QImage.Height>()(qImage);
             int bytesPerLine = Original<QImage.BytesPerLine>()(qImage);
