@@ -48,5 +48,12 @@
             [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
             internal delegate void SetVertexSource(nuint igProgramAttr, nint source);
         }
+
+        internal static class IGProjectionMatrixAttr
+        {
+            [FunctionName("?setMatrix@igProjectionMatrixAttr@Attrs@Gap@@UAEXABVigMatrix44f@Math@3@@Z")]
+            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate void SetMatrix(nuint igProjectionMatrixAttr, nuint igMatrix44f);
+        }
     }
 }
