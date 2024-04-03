@@ -10,13 +10,15 @@ namespace EarthRipperHook.Native
     {
         internal class QString : IDisposable
         {
+            private static nuint HeaderOffset => (nuint)(nuint.Size == 4 ? 0x10 : 0x18);
+
             [StructLayout(LayoutKind.Sequential)]
             private struct QStringDataHeader
             {
                 public int ReferenceCount;
                 public int Size;
                 public uint Allocated;
-                public uint Offset;
+                public nuint Offset;
             }
 
             internal nuint NativeQString { get; }
@@ -45,7 +47,7 @@ namespace EarthRipperHook.Native
                     ReferenceCount = -1,                  // -1 so Qt never frees this memory
                     Size = value.Length,                  // Number of characters
                     Allocated = (uint)(value.Length + 2), // Number of characters plus null terminator and padding(?)
-                    Offset = 16                           // String data offset relative to start of header; always 16
+                    Offset = HeaderOffset                 // String data offset relative to start of header
                 };
 
                 byte[] qStringData =
@@ -92,7 +94,7 @@ namespace EarthRipperHook.Native
 
                 Struct.FromPtr(NativeQStringData, out QStringDataHeader header);
 
-                if (header.ReferenceCount < -1 || header.Size < 0 || header.Offset != 16)
+                if (header.ReferenceCount < -1 || header.Size < 0 || header.Offset != HeaderOffset)
                 {
                     Log.Warning(
                         $"Unexpected QString header contents at {NativeQStringData}:",
@@ -104,7 +106,7 @@ namespace EarthRipperHook.Native
                     return string.Empty;
                 }
 
-                Memory.CurrentProcess.ReadRaw(NativeQStringData + 16, out byte[] bytes, header.Size * 2);
+                Memory.CurrentProcess.ReadRaw(NativeQStringData + header.Offset, out byte[] bytes, header.Size * 2);
                 return Encoding.Unicode.GetString(bytes);
             }
         }

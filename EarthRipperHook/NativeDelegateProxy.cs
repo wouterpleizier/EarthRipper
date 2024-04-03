@@ -22,14 +22,27 @@ namespace EarthRipperHook
         {
             Type delegateType = typeof(TNativeDelegate);
 
-            if (delegateType.GetCustomAttribute<X86FunctionAttribute>() == null
-                && delegateType.GetCustomAttribute<X64FunctionAttribute>() == null)
+            string procName;
+            if (nuint.Size == 4)
             {
-                throw new InvalidOperationException("No x86 or x64 function attribute found on delegate");
-            }
+                if (delegateType.GetCustomAttribute<X86FunctionAttribute>() == null)
+                {
+                    throw new InvalidOperationException($"No x86 function attribute found for {delegateType}");
+                }
 
-            FunctionNameAttribute? functionNameAttribute = delegateType.GetCustomAttribute<FunctionNameAttribute>()
-                ?? throw new InvalidOperationException("No function name attribute found on delegate");
+                procName = delegateType.GetCustomAttribute<X86FunctionNameAttribute>()?.Name
+                    ?? throw new InvalidOperationException($"No x86 function name attribute found for {delegateType}");
+            }
+            else
+            {
+                if (delegateType.GetCustomAttribute<X64FunctionAttribute>() == null)
+                {
+                    throw new InvalidOperationException($"No x64 function attribute found for {delegateType}");
+                }
+
+                procName = delegateType.GetCustomAttribute<X64FunctionNameAttribute>()?.Name
+                    ?? throw new InvalidOperationException($"No x64 function name attribute found for {delegateType}");
+            }
 
             // The function library/DLL may be specified on the delegate itself or its containing type/module/assembly.
             FunctionLibraryAttribute? functionLibraryAttribute = delegateType.GetCustomAttribute<FunctionLibraryAttribute>();
@@ -49,10 +62,10 @@ namespace EarthRipperHook
 
             functionLibraryAttribute ??= delegateType.Module.GetCustomAttribute<FunctionLibraryAttribute>()
                 ?? delegateType.Assembly.GetCustomAttribute<FunctionLibraryAttribute>()
-                ?? throw new InvalidOperationException("No function library attribute found on delegate or its containing type(s), module or assembly");
+                ?? throw new InvalidOperationException($"No function library attribute found for {delegateType} or its containing type(s), module or assembly");
 
             MethodInfo delegateInvokeMethod = delegateType.GetMethod("Invoke")
-                ?? throw new InvalidOperationException("No Invoke method found on delegate");
+                ?? throw new InvalidOperationException($"No Invoke method found for {delegateType}");
 
             _returnType = delegateInvokeMethod.ReturnType;
             bool isVoid = _returnType == typeof(void);
@@ -75,7 +88,12 @@ namespace EarthRipperHook
                 : [.. delegateParameterTypes, _returnType]);
 
             _hookHandler = handlerMethod.CreateDelegate<TNativeDelegate>();
-            long address = (long)NativeHelper.GetProcAddress(functionLibraryAttribute.Library, functionNameAttribute.Name);
+
+            long address = (long)NativeHelper.GetProcAddress(functionLibraryAttribute.Library, procName);
+            if (address == 0x0)
+            {
+                throw new InvalidOperationException($"Symbol {procName} not found in {functionLibraryAttribute.Library}");
+            }
 
             IHook<TNativeDelegate> hook = ReloadedHooks.Instance.CreateHook(_hookHandler, address);
 

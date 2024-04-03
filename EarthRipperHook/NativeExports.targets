@@ -1,0 +1,112 @@
+﻿<Project>
+
+  <ItemGroup>
+    <PackageReference Include="DNNE" Version="2.0.6" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    
+    <!-- DNNE only produces a single runtime/binary by default. We want both x86 and x64, so we'll do it ourselves. -->
+    <DnneBuildExports>false</DnneBuildExports>
+
+    <Generator>dotnet "$(PkgDNNE)/tools/dnne-gen.dll"</Generator>
+    <PlatformSourcePath>$(PkgDNNE)/tools/platform</PlatformSourcePath>
+
+    <RuntimeIdentifierX86>win-x86</RuntimeIdentifierX86>
+    <NetHostDirX86>$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.$(RuntimeIdentifierX86)/$(BundledNETCoreAppPackageVersion)/runtimes/$(RuntimeIdentifierX86)/native</NetHostDirX86>
+    <OutputNameX86>$(MSBuildProjectName)32.dll</OutputNameX86>
+
+    <RuntimeIdentifierX64>win-x64</RuntimeIdentifierX64>
+    <NetHostDirX64>$(NetCoreTargetingPackRoot)/Microsoft.NETCore.App.Host.$(RuntimeIdentifierX64)/$(BundledNETCoreAppPackageVersion)/runtimes/$(RuntimeIdentifierX64)/native</NetHostDirX64>
+    <OutputNameX64>$(MSBuildProjectName)64.dll</OutputNameX64>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <GeneratedSourceFile Include="$(IntermediateOutputPath)/$(MSBuildProjectName).g.c" />
+  </ItemGroup>
+
+  <Target
+    Name="GenerateNativeExports"
+    Inputs="@(IntermediateAssembly)"
+    Outputs="@(GeneratedSourceFile)"
+    AfterTargets="CoreCompile">
+
+    <Exec Command="$(Generator) @(IntermediateAssembly) -o @(GeneratedSourceFile)" />
+  </Target>
+
+  <ItemGroup>
+    <None Include="$(IntermediateOutputPath)/$(OutputNameX86);$(IntermediateOutputPath)/$(OutputNameX64)">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <UsingTask
+    TaskName="DNNE.BuildTasks.CreateCompileCommand"
+    AssemblyFile = "$(PkgDNNE)/build/net472/DNNE.BuildTasks.dll" />
+
+  <Target
+    Name="BuildNativeExportsX86"
+    AfterTargets="GenerateNativeExports"
+    DependsOnTargets="ResolvePackageAssets;ResolveFrameworkReferences">
+
+    <PropertyGroup>
+      <__GeneratedSourceFile>@(GeneratedSourceFile)</__GeneratedSourceFile>
+    </PropertyGroup>
+
+    <CreateCompileCommand
+      AssemblyName="$(MSBuildProjectName)"
+      NetHostPath="$([MSBuild]::NormalizePath($(NetHostDirX86)))"
+      PlatformPath="$([MSBuild]::NormalizePath($(PlatformSourcePath)))"
+      Source="$([MSBuild]::NormalizePath($(__GeneratedSourceFile)))"
+      OutputName="$(OutputNameX86)"
+      OutputPath="$([MSBuild]::NormalizePath($(IntermediateOutputPath)))"
+      RuntimeID="$(RuntimeIdentifierX86)"
+      Architecture="$(TargetedSDKArchitecture)"
+      Configuration="$(Configuration)"
+      TargetFramework="$(TargetFramework)">
+
+      <Output TaskParameter="Command" PropertyName="CompilerCmd" />
+      <Output TaskParameter="CommandArguments" PropertyName="CompilerArgs" />
+    </CreateCompileCommand>
+
+    <Exec
+      Command="&quot;$(CompilerCmd)&quot; $(CompilerArgs)"
+      WorkingDirectory="$(IntermediateOutputPath)"
+      ConsoleToMSBuild="true" />
+  </Target>
+
+  <Target
+    Name="BuildNativeExportsX64"
+    AfterTargets="GenerateNativeExports"
+    DependsOnTargets="ResolvePackageAssets;ResolveFrameworkReferences">
+
+    <PropertyGroup>
+      <__GeneratedSourceFile>@(GeneratedSourceFile)</__GeneratedSourceFile>
+    </PropertyGroup>
+
+    <CreateCompileCommand
+      AssemblyName="$(MSBuildProjectName)"
+      NetHostPath="$([MSBuild]::NormalizePath($(NetHostDirX64)))"
+      PlatformPath="$([MSBuild]::NormalizePath($(PlatformSourcePath)))"
+      Source="$([MSBuild]::NormalizePath($(__GeneratedSourceFile)))"
+      OutputName="$(OutputNameX64)"
+      OutputPath="$([MSBuild]::NormalizePath($(IntermediateOutputPath)))"
+      RuntimeID="$(RuntimeIdentifierX64)"
+      Architecture="$(TargetedSDKArchitecture)"
+      Configuration="$(Configuration)"
+      TargetFramework="$(TargetFramework)">
+
+      <Output TaskParameter="Command" PropertyName="CompilerCmd" />
+      <Output TaskParameter="CommandArguments" PropertyName="CompilerArgs" />
+    </CreateCompileCommand>
+
+    <Exec
+      Command="&quot;$(CompilerCmd)&quot; $(CompilerArgs)"
+      WorkingDirectory="$(IntermediateOutputPath)"
+      ConsoleToMSBuild="true" />
+  </Target>
+
+</Project>

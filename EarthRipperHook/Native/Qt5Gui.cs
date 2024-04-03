@@ -7,24 +7,24 @@ namespace EarthRipperHook.Native
     {
         internal static class QImage
         {
-            [FunctionName("?bytesPerLine@QImage@@QBEHXZ")]
-            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            [X86FunctionName("?bytesPerLine@QImage@@QBEHXZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?bytesPerLine@QImage@@QEBAHXZ"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate int BytesPerLine(nuint qImage);
 
-            [FunctionName("?constBits@QImage@@QBEPBEXZ")]
-            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            [X86FunctionName("?constBits@QImage@@QBEPBEXZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?constBits@QImage@@QEBAPEBEXZ"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate nuint ConstBits(nuint qImage);
 
-            [FunctionName("?height@QImage@@QBEHXZ")]
-            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            [X86FunctionName("?height@QImage@@QBEHXZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?height@QImage@@QEBAHXZ"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate int Height(nuint qImage);
 
-            [FunctionName("?save@QImage@@QBE_NABVQString@@PBDH@Z")]
-            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            [X86FunctionName("?save@QImage@@QBE_NABVQString@@PBDH@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?save@QImage@@QEBA_NAEBVQString@@PEBDH@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate bool Save(nuint qImage, nuint fileName, [MarshalAs(UnmanagedType.LPStr)] string format, int quality);
 
-            [FunctionName("?width@QImage@@QBEHXZ")]
-            [X86Function(X86CallingConventions.MicrosoftThiscall), X64Function(X64CallingConventions.Microsoft)]
+            [X86FunctionName("?width@QImage@@QBEHXZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?width@QImage@@QEBAHXZ"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate int Width(nuint qImage);
         }
     }

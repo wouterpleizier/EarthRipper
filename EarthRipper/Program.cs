@@ -1,86 +1,67 @@
 ﻿using EarthRipperShared;
 using Microsoft.Win32;
 using Reloaded.Injector;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace EarthRipper
 {
     internal class Program
     {
-        const string TargetExecutableName = "googleearth.exe";
+        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool IsWow64Process([In] nint processHandle, [Out, MarshalAs(UnmanagedType.Bool)] out bool wow64Process);
+
+        const string TargetExecutableName = "googleearth";
+
+        const string X86LibraryName = "EarthRipperHook32.dll";
+        const string X86RunFunction = "_Run@4";
+
+        const string X64LibraryName = "EarthRipperHook64.dll";
+        const string X64RunFunction = "Run";
 
         static void Main(string[] args)
         {
             try
             {
-                bool targetIs64Bit;
-                string? targetPath;
-                if (Environment.Is64BitOperatingSystem && TryGetTargetPath(RegistryView.Registry64, out targetPath))
+                Process? targetProcess = GetTargetProcess(out bool targetIs64Bit);
+                
+                if (targetProcess == null)
                 {
-                    targetIs64Bit = true;
-                }
-                else if (TryGetTargetPath(RegistryView.Registry32, out targetPath))
-                {
-                    targetIs64Bit = false;
-                }
-                else
-                {
-                    Log.Error("Unable to determine installation location of Google Earth Pro. Try reinstalling.");
+                    Log.Error("Failed to retrieve or launch target process. Exiting...");
+                    Console.ReadKey();
                     return;
-                }
-
-                if (!Path.Exists(targetPath))
-                {
-                    Log.Error($"{TargetExecutableName} not found at installation location. Try reinstalling.");
-                    return;
-                }
-
-                Process? process = Process.GetProcessesByName("googleearth").FirstOrDefault();
-                if (process == null)
-                {
-                    Log.Information("Launching Google Earth Pro...");
-                    process = Process.Start(targetPath);
-
-                    //process = Process.Start(new ProcessStartInfo(targetPath)
-                    //{
-                    //    UseShellExecute = false,
-                    //    RedirectStandardOutput = true,
-                    //    RedirectStandardError = true
-                    //});
-                    //process.OutputDataReceived += (sender, e) => { if (e.Data != null) { Logger.LogInformation(e.Data); } };
-                    //process.BeginOutputReadLine();
-
-                    //process.ErrorDataReceived += (sender, e) => { if (e.Data != null) { Logger.LogError(e.Data); } };
-                    //process.BeginErrorReadLine();
                 }
 
                 Log.Information("Injecting into Google Earth Pro...");
                 string baseHookPath = typeof(EarthRipperHook.EntryPoint).Assembly.Location;
                 string? hookDirectory = Path.GetDirectoryName(baseHookPath);
-                string? hookName = string.Concat(
-                    Path.GetFileNameWithoutExtension(baseHookPath),
-                    "NE", //targetIs64Bit ? "64" : "32",
-                    Path.GetExtension(baseHookPath));
+                string? hookName = targetIs64Bit ? X64LibraryName : X86LibraryName;
 
                 string hookPath;
                 if (hookDirectory == null || hookName == null || !Path.Exists(hookPath = Path.Combine(hookDirectory, hookName)))
                 {
-                    Log.Error($"Unable to resolve hook library path");
+                    Log.Error($"Library {hookName} not found in {hookDirectory}. Exiting...");
+                    Console.ReadKey();
                     return;
                 }
 
                 int currentProcessID = Process.GetCurrentProcess().Id;
                 Log.Initialize(LogUtil.GetSharedLogName(currentProcessID));
 
-                Injector injector = new Injector(process);
-                long handle = injector.Inject(Path.Combine(hookDirectory, hookName));
+                Injector injector = new Injector(targetProcess);
+                long handle = injector.Inject(hookPath);
                 if (handle == 0)
                 {
-                    Log.Error("Hook injection failed");
+                    Log.Error("Hook injection failed. Exiting...");
+                    Console.ReadKey();
+                    return;
                 }
 
                 RunResult result = (RunResult)injector.CallFunction(
-                    hookName, "_Run@4",
+                    hookName,
+                    targetIs64Bit ? X64RunFunction : X86RunFunction,
                     new RunArgs()
                     {
                         InjectorProcessID = currentProcessID,
@@ -96,7 +77,7 @@ namespace EarthRipper
                     Log.Error($"Hook initialization failed ({result})");
                 }
 
-                while (!process.HasExited)
+                while (!targetProcess.HasExited)
                 {
                     Thread.Sleep(100);
                 }
@@ -108,18 +89,73 @@ namespace EarthRipper
             }
         }
 
-        private static bool TryGetTargetPath(RegistryView registryView, out string? path)
+        private static Process? GetTargetProcess(out bool is64Bit)
         {
-            RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, registryView);
-            if (baseKey.OpenSubKey("SOFTWARE\\Google\\Google Earth Pro") is RegistryKey key
-                && key.GetValue("InstallLocation") is string installLocation)
+            Process? process = Process.GetProcessesByName(TargetExecutableName).FirstOrDefault();
+            if (process != null)
             {
-                path = Path.Combine(installLocation, TargetExecutableName);
-                return true;
+                Log.Information("Google Earth Pro process found");
+            }
+            else
+            {
+                string? path = GetInstallationPathFromRegistry();
+                if (!Path.Exists(path))
+                {
+                    Log.Information($"Failed to launch Google Earth Pro automatically because no valid installation path could be found. Start {TargetExecutableName}.exe manually if it is present, or (re)install if not.");
+
+                    while (process == null)
+                    {
+                        Thread.Sleep(2000);
+                        process = Process.GetProcessesByName(TargetExecutableName).FirstOrDefault();
+                    }
+                }
+                else
+                {
+                    Log.Information("Launching Google Earth Pro...");
+                    process = Process.Start(path);
+                }
             }
 
-            path = default;
-            return false;
+            if (Environment.Is64BitOperatingSystem)
+            {
+                if (IsWow64Process(process.Handle, out bool isWow64Process))
+                {
+                    is64Bit = !isWow64Process;
+                }
+                else
+                {
+                    Log.Error("Unable to determine whether Google Earth Pro process is 32-bit or 64-bit",
+                        new Win32Exception(Marshal.GetLastWin32Error()));
+
+                    is64Bit = default;
+                    return null;
+                }
+            }
+            else
+            {
+                is64Bit = false;
+            }
+
+            return process;
+        }
+
+        private static string? GetInstallationPathFromRegistry()
+        {
+            RegistryView[] registryViews = Environment.Is64BitOperatingSystem
+                ? [RegistryView.Registry64, RegistryView.Registry32]
+                : [RegistryView.Registry32];
+
+            foreach (RegistryView registryView in registryViews)
+            {
+                RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, registryView);
+                if (baseKey.OpenSubKey("SOFTWARE\\Google\\Google Earth Pro") is RegistryKey key
+                    && key.GetValue("InstallLocation") is string installLocation)
+                {
+                    return Path.Combine(installLocation, TargetExecutableName + ".exe");
+                }
+            }
+
+            return null;
         }
     }
 }
