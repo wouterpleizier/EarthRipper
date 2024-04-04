@@ -109,4 +109,24 @@
       ConsoleToMSBuild="true" />
   </Target>
 
+  <Target
+    Name="AddRuntimeDependenciesToContent"
+    BeforeTargets="GetCopyToOutputDirectoryItems"
+    DependsOnTargets="GenerateBuildDependencyFile;GenerateBuildRuntimeConfigurationFiles">
+    
+    <ItemGroup>
+      <ContentWithTargetPath
+        Include="$(ProjectDepsFilePath)"
+        Condition="'$(GenerateDependencyFile)' == 'true'"
+        CopyToOutputDirectory="PreserveNewest"
+        TargetPath="$(ProjectDepsFileName)" />
+      
+      <ContentWithTargetPath
+        Include="$(ProjectRuntimeConfigFilePath)"
+        Condition="'$(GenerateRuntimeConfigurationFiles)' == 'true'"
+        CopyToOutputDirectory="PreserveNewest"
+        TargetPath="$(ProjectRuntimeConfigFileName)" />
+    </ItemGroup>
+  </Target>
+
 </Project>
