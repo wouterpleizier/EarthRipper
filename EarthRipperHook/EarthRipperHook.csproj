@@ -5,18 +5,20 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EarthRipperShared\EarthRipperShared.csproj" />
     
     <PackageReference Include="Reloaded.Hooks" Version="4.3.0" />
+    <PackageReference Include="Reloaded.Memory.Sigscan" Version="3.1.1" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="CaptureTemplates\**\*.*" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
-  <Import Project="NativeExports.targets"/>
+  <Import Project="NativeExports.targets" />
 
 </Project>
