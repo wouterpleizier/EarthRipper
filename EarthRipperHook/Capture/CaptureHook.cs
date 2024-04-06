@@ -223,7 +223,7 @@ namespace EarthRipperHook.Capture
                 return default;
             }
 
-            void OverrideClearColor(nuint igClearAttr, nuint igVec4f)
+            void OverrideClearColor(nuint igAttrContext, nuint igVec4f)
             {
                 // The default clear color is a dark gray, but black makes more sense when capturing elevation.
                 Original<IGVec4f.Set>()(igVec4f, 0f, 0f, 0f, 0f);
@@ -264,7 +264,7 @@ namespace EarthRipperHook.Capture
             {
                 using var bindToken = Hook<IGProgramAttr.Bind>(OverrideBind, exclusive: false, throwOnFailure: true);
 
-                using var clearToken = Hook<IGClearAttr.SetColor>(OverrideClearColor, exclusive: true, throwOnFailure: true);
+                using var clearToken = Hook<IGAttrContext.SetClearColor>(OverrideClearColor, exclusive: true, throwOnFailure: true);
                 using var drawToken = Hook<IGOglVisualContext.GenericDraw>(OverrideGenericDraw, exclusive: true, throwOnFailure: true);
                 using var drawImageToken = Hook<QGraphicsView.Render>(OverrideRender, exclusive: true, throwOnFailure: true);
                 using var pathToken = Hook<QFileDialog.GetSaveFileName>(OverrideSaveImagePath, exclusive: true, throwOnFailure: true);

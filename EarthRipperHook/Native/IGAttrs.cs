@@ -3,11 +3,11 @@
     [FunctionLibrary("IGAttrs.dll")]
     internal static class IGAttrs
     {
-        internal static class IGClearAttr
+        internal static class IGAttrContext
         {
-            [X86FunctionName("?setColor@igClearAttr@Attrs@Gap@@QAEXABVigVec4f@Math@3@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
-            [X64FunctionName("?setColor@igClearAttr@Attrs@Gap@@QEAAXAEBVigVec4f@Math@3@@Z"), X64Function(X64CallingConventions.Microsoft)]
-            internal delegate void SetColor(nuint igClearAttr, nuint igVec4f);
+            [X86FunctionName("?setClearColor@igAttrContext@Attrs@Gap@@QAEXABVigVec4f@Math@3@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?setClearColor@igAttrContext@Attrs@Gap@@QEAAXAEBVigVec4f@Math@3@@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate void SetClearColor(nuint igAttrContext, nuint igVec4f);
         }
 
         internal static class IGProgramAttr
