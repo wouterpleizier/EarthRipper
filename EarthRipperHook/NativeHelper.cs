@@ -14,11 +14,14 @@ namespace EarthRipperHook
         private delegate nuint GetProcAddressDelegate(nuint module, string procName);
         private static GetProcAddressDelegate _getProcAddressFunc;
 
+        private static readonly object _lock;
         private static readonly Dictionary<string, nuint> _moduleAddresses;
 
         static NativeHelper()
         {
             _getProcAddressFunc = (_, _) => throw new InvalidOperationException();
+            
+            _lock = new object();
             _moduleAddresses = [];
         }
 
@@ -29,18 +32,21 @@ namespace EarthRipperHook
 
         internal static nuint GetModuleAddress(string moduleName)
         {
-            if (!_moduleAddresses.TryGetValue(moduleName, out nuint result))
+            lock (_lock)
             {
-                if (Process.GetCurrentProcess()
-                    .Modules.Cast<ProcessModule>()
-                    .FirstOrDefault(module => module.ModuleName == moduleName) is ProcessModule module)
+                if (!_moduleAddresses.TryGetValue(moduleName, out nuint result))
                 {
-                    result = (nuint)module.BaseAddress;
-                    _moduleAddresses.Add(moduleName, result);
+                    if (Process.GetCurrentProcess()
+                        .Modules.Cast<ProcessModule>()
+                        .FirstOrDefault(module => module.ModuleName == moduleName) is ProcessModule module)
+                    {
+                        result = (nuint)module.BaseAddress;
+                        _moduleAddresses.Add(moduleName, result);
+                    }
                 }
-            }
 
-            return result;
+                return result;
+            }
         }
 
         internal static nuint GetProcAddress(string moduleName, string procName)
