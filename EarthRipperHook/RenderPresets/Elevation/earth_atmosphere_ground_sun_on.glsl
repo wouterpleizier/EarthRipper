@@ -54,8 +54,13 @@ vec2 normalizedFloatToUShort(float value)
 
 void main()
 {
-	vec2 rg = normalizedFloatToUShort(vout_elevationNormalized);
-	gl_FragColor = vec4(rg.r, rg.g, 0.0, 1.0);
+	#if defined(EARTHRIPPER_CAPTURE)
+		vec2 rg = normalizedFloatToUShort(vout_elevationNormalized);
+		gl_FragColor = vec4(rg.r, rg.g, 0.0, 1.0);
+	#else
+		gl_FragColor = vec4(vout_elevationNormalized, vout_elevationNormalized, vout_elevationNormalized, 1.0);
+	#endif
+
 	gl_FragDepth = 1.0 - vout_elevationNormalized;
 }
 

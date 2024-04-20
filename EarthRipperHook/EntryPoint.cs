@@ -1,5 +1,6 @@
 ﻿using EarthRipperHook.Capture;
 using EarthRipperHook.OrthoCamera;
+using EarthRipperHook.RenderPreset;
 using EarthRipperShared;
 using Reloaded.Memory;
 using System.Runtime.InteropServices;
@@ -26,8 +27,8 @@ namespace EarthRipperHook
 
             Log.Initialize(LogUtil.GetSharedLogName(args.InjectorProcessID));
             NativeHelper.Initialize(args.GetProcAddressAddress);
-            ShaderHelper.Initialize();
             MenuManager.Initialize();
+            RenderPresetManager.Initialize();
 
             _captureHook = new CaptureHook();
             _orthoCameraHook = new OrthoCameraHook();

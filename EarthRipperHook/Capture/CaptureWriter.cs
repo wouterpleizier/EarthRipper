@@ -1,4 +1,5 @@
-﻿using Reloaded.Memory.Sources;
+﻿using EarthRipperHook.RenderPreset;
+using Reloaded.Memory.Sources;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -9,7 +10,7 @@ namespace EarthRipperHook.Capture
 {
     internal static class CaptureWriter
     {
-        internal static bool Write(CaptureTask captureTask, nuint qImage, nuint fileName, string format, int quality)
+        internal static bool Write(RenderPresetDefinition renderPreset, nuint qImage, nuint fileName, string format, int quality)
         {
             int renderWidth = Original<QImage.Width>()(qImage);
             int renderHeight = Original<QImage.Height>()(qImage);
@@ -21,7 +22,7 @@ namespace EarthRipperHook.Capture
             Memory.CurrentProcess.ReadRaw(data, out byte[] bgraBytes, byteCount);
 
             List<byte> bytes = [];
-            if (captureTask.Format == OutputFormat.PNG_Gray16)
+            if (renderPreset.OutputFormat == OutputFormat.PNG_Gray16)
             {
                 for (int i = 0; i < byteCount; i += bytesPerPixel)
                 {
@@ -39,7 +40,7 @@ namespace EarthRipperHook.Capture
                 }
             }
 
-            (PixelFormat pixelFormat, int stride) = captureTask.Format switch
+            (PixelFormat pixelFormat, int stride) = renderPreset.OutputFormat switch
             {
                 OutputFormat.UserSpecified or OutputFormat.JPG or OutputFormat.PNG =>
                     (PixelFormats.Rgb24,
@@ -60,7 +61,7 @@ namespace EarthRipperHook.Capture
                 pixels: bytes.ToArray(),
                 stride: stride);
 
-            (int outputWidth, int outputHeight) = GetScaledOutputSize(captureTask, renderWidth, renderHeight);
+            (int outputWidth, int outputHeight) = GetScaledOutputSize(renderPreset, renderWidth, renderHeight);
             if (outputWidth != renderWidth || outputHeight != renderHeight)
             {
                 double scaleX = (double)outputWidth / renderWidth;
@@ -69,13 +70,13 @@ namespace EarthRipperHook.Capture
             }
 
             BitmapEncoder encoder;
-            if ((captureTask.Format is OutputFormat.UserSpecified && format == "JPG")
-                || captureTask.Format is OutputFormat.JPG)
+            if ((renderPreset.OutputFormat is OutputFormat.UserSpecified && format == "JPG")
+                || renderPreset.OutputFormat is OutputFormat.JPG)
             {
-                encoder = new JpegBitmapEncoder() { QualityLevel = captureTask.Quality ?? quality };
+                encoder = new JpegBitmapEncoder() { QualityLevel = renderPreset.OutputQuality ?? quality };
             }
-            else if ((captureTask.Format is OutputFormat.UserSpecified && format == "PNG")
-                || captureTask.Format is OutputFormat.PNG or OutputFormat.PNG_Gray16)
+            else if ((renderPreset.OutputFormat is OutputFormat.UserSpecified && format == "PNG")
+                || renderPreset.OutputFormat is OutputFormat.PNG or OutputFormat.PNG_Gray16)
             {
                 encoder = new PngBitmapEncoder();
             }
@@ -94,29 +95,29 @@ namespace EarthRipperHook.Capture
             return true;
         }
 
-        private static (int width, int height) GetScaledOutputSize(CaptureTask captureTask,
+        private static (int width, int height) GetScaledOutputSize(RenderPresetDefinition renderPreset,
                                                                    int renderWidth,
                                                                    int renderHeight)
         {
             double width = renderWidth;
             double height = renderHeight;
 
-            if (captureTask.ScaleFactor is not null and > 0.0 and < 1.0)
+            if (renderPreset.OutputScaleFactor is not null and > 0.0 and < 1.0)
             {
-                width *= captureTask.ScaleFactor.Value;
-                height *= captureTask.ScaleFactor.Value;
+                width *= renderPreset.OutputScaleFactor.Value;
+                height *= renderPreset.OutputScaleFactor.Value;
             }
 
-            if (captureTask.MaxWidth is not null and > 0 && width > captureTask.MaxWidth)
+            if (renderPreset.OutputMaxWidth is not null and > 0 && width > renderPreset.OutputMaxWidth)
             {
-                double scaleFactor = captureTask.MaxWidth.Value / width;
+                double scaleFactor = renderPreset.OutputMaxWidth.Value / width;
                 width *= scaleFactor;
                 height *= scaleFactor;
             }
 
-            if (captureTask.MaxHeight is not null and > 0 && height > captureTask.MaxHeight)
+            if (renderPreset.OutputMaxHeight is not null and > 0 && height > renderPreset.OutputMaxHeight)
             {
-                double scaleFactor = captureTask.MaxHeight.Value / height;
+                double scaleFactor = renderPreset.OutputMaxHeight.Value / height;
                 width *= scaleFactor;
                 height *= scaleFactor;
             }

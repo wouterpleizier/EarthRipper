@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="CaptureTemplates\**\*.*" CopyToOutputDirectory="Always" />
+    <None Update="RenderPresets\**\*.*" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
   <Import Project="NativeExports.targets" />

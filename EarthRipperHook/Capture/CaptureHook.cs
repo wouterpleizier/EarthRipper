@@ -1,11 +1,7 @@
-﻿using Reloaded.Memory.Sources;
+﻿using EarthRipperHook.RenderPreset;
+using Reloaded.Memory.Sources;
 using System.IO;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using static EarthRipperHook.Native.IGAttrs;
-using static EarthRipperHook.Native.IGGfx;
-using static EarthRipperHook.Native.IGMath;
 using static EarthRipperHook.Native.Qt5Core;
 using static EarthRipperHook.Native.Qt5Gui;
 using static EarthRipperHook.Native.Qt5Widgets;
@@ -14,23 +10,16 @@ namespace EarthRipperHook.Capture
 {
     internal class CaptureHook
     {
-        private readonly string _captureTemplatesPath;
-        private readonly Queue<QString> _allocatedQStrings;
+        private readonly Queue<QString> _allocatedQStrings = [];
 
         public CaptureHook()
         {
-            string hookPath = Path.GetDirectoryName(typeof(CaptureHook).Assembly.Location)
-                ?? throw new Exception("Unable to determine capture templates path");
-
-            _captureTemplatesPath = Path.Combine(hookPath, "CaptureTemplates");
-            _allocatedQStrings = [];
-
             PatchMaximumCaptureSize();
 
             Hook<QAbstractButton.Clicked>(HandleButtonClicked);
         }
 
-        private void PatchMaximumCaptureSize()
+        private static void PatchMaximumCaptureSize()
         {
             // The render destination for saving images is clamped to 5000x5000 pixels by default, and images larger
             // than this are rendered in parts. For example, when the desired image size is 8192x4096, a 5000x4096
@@ -71,12 +60,20 @@ namespace EarthRipperHook.Capture
 
         private void HandleButtonClicked(nuint qAbstractButton, bool isChecked)
         {
-            Queue<CaptureTask>? queuedCaptures = InvokeClickAndPrepareCapture(qAbstractButton, isChecked);
-
-            while (queuedCaptures?.Count > 0)
+            if (InvokeClickAndTryGetSaveImagePath(qAbstractButton, isChecked) is string saveImagePath)
             {
-                CaptureTask captureTask = queuedCaptures.Dequeue();
-                InvokeClickAndPerformCapture(qAbstractButton, isChecked, captureTask);
+                foreach ((RenderPresetDefinition renderPreset, string outputPath) in GetCaptureTasks(saveImagePath))
+                {
+                    try
+                    {
+                        RenderPresetManager.ActivateRenderPreset(renderPreset, RenderPresetContext.Capture);
+                        InvokeClickAndPerformCapture(qAbstractButton, isChecked, renderPreset, outputPath);
+                    }
+                    finally
+                    {
+                        RenderPresetManager.DeactivateRenderPreset(RenderPresetContext.Capture);
+                    }
+                }
             }
 
             // Don't dispose the last allocated QString yet, as it may get accessed the next time the dialog opens.
@@ -87,10 +84,11 @@ namespace EarthRipperHook.Capture
             }
         }
 
-        private Queue<CaptureTask>? InvokeClickAndPrepareCapture(nuint qAbstractButton, bool isChecked)
+        private string? InvokeClickAndTryGetSaveImagePath(nuint qAbstractButton, bool isChecked)
         {
-            Queue<CaptureTask>? queuedCaptures = null;
-            nuint InvokeOriginalAndGetCaptureQueue(nuint result, nuint parentWidget, nuint caption, nuint dir, nuint filter, nuint selectedFilter)
+            string? saveImagePath = null;
+
+            nuint CaptureSaveImagePath(nuint result, nuint parentWidget, nuint caption, nuint dir, nuint filter, nuint selectedFilter)
             {
                 // Filters are localized, but we can always count on the extensions being present.
                 string filterAsString = new QString(filter).ToString();
@@ -99,38 +97,29 @@ namespace EarthRipperHook.Capture
                     nuint path = Original<QFileDialog.GetSaveFileName>()(result, parentWidget, caption, dir, filter, selectedFilter);
                     SuppressOriginal<QFileDialog.GetSaveFileName>(path);
 
-                    string saveImagePath = new QString(path).ToString();
-                    queuedCaptures = new Queue<CaptureTask>(GetCaptureTasks(saveImagePath));
+                    saveImagePath = new QString(path).ToString();
                 }
 
                 return default;
             }
 
-            bool SuppressSaveIfCapturesAreQueued(nuint qImage, nuint fileName, string format, int quality)
+            bool SuppressSaveImage(nuint qImage, nuint fileName, string format, int quality)
             {
-                if (queuedCaptures?.Count > 0)
-                {
-                    SuppressOriginal<QImage.Save>(true);
-                    return true;
-                }
-                else
-                {
-                    Log.Information("No capture template(s) specified, saving image with default behavior instead");
-                    return default;
-                }
+                SuppressOriginal<QImage.Save>(true);
+                return true;
             }
 
-            using var pathToken = Hook<QFileDialog.GetSaveFileName>(InvokeOriginalAndGetCaptureQueue, exclusive: true);
-            using var saveToken = Hook<QImage.Save>(SuppressSaveIfCapturesAreQueued, exclusive: true);
+            using var pathToken = Hook<QFileDialog.GetSaveFileName>(CaptureSaveImagePath, exclusive: true);
+            using var saveToken = Hook<QImage.Save>(SuppressSaveImage, exclusive: true);
 
             // Call these regardless of exclusive access, otherwise no buttons will work anymore.
             Original<QAbstractButton.Clicked>()(qAbstractButton, isChecked);
             SuppressOriginal<QAbstractButton.Clicked>();
 
-            return queuedCaptures;
+            return saveImagePath;
         }
 
-        private IEnumerable<CaptureTask> GetCaptureTasks(string saveImagePath)
+        private static IEnumerable<(RenderPresetDefinition renderPreset, string outputPath)> GetCaptureTasks(string saveImagePath)
         {
             string[] fileNameParts = Path.GetFileNameWithoutExtension(saveImagePath)
                 .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -144,38 +133,15 @@ namespace EarthRipperHook.Capture
                 yield break;
             }
 
-            foreach (string captureTemplateName in fileNameParts.Skip(1))
+            bool validRenderPresetWasSpecified = false;
+            foreach (string renderPresetName in fileNameParts.Skip(1))
             {
-                CaptureTask? captureTask = null;
-                string captureTemplateDirectory = Path.Combine(_captureTemplatesPath, captureTemplateName);
-                string captureTemplatePath = Path.Combine(captureTemplateDirectory, "Settings.json");
-                if (File.Exists(captureTemplatePath))
+                if (RenderPresetManager.GetRenderPreset(renderPresetName) is RenderPresetDefinition renderPreset)
                 {
-                    try
-                    {
-                        JsonSerializerOptions options = new() { AllowTrailingCommas = true };
-                        options.Converters.Add(new JsonStringEnumConverter());
-
-                        captureTask = JsonSerializer.Deserialize<CaptureTask>(File.ReadAllText(captureTemplatePath),
-                            options);
-                    }
-                    catch (Exception exception)
-                    {
-                        Log.Error($"Unable to parse capture template {captureTemplateName}; skipping...");
-                        Log.Error(exception);
-                    }
-                }
-                else
-                {
-                    Log.Warning($"Capture template {captureTemplateName} does not exist; skipping...");
-                }
-
-                if (captureTask != null)
-                {
-                    string path = new StringBuilder(captureTask.Path)
-                        .Replace(CaptureTask.DirectoryIdentifier, baseDirectory)
-                        .Replace(CaptureTask.FileNameIdentifier, baseName)
-                        .Append(captureTask.Format switch
+                    string outputPath = new StringBuilder(renderPreset.OutputPath)
+                        .Replace(RenderPresetDefinition.DirectoryIdentifier, baseDirectory)
+                        .Replace(RenderPresetDefinition.FileNameIdentifier, baseName)
+                        .Append(renderPreset.OutputFormat switch
                         {
                             OutputFormat.JPG => ".jpg",
                             OutputFormat.PNG or OutputFormat.PNG_Gray16 => ".png",
@@ -183,41 +149,30 @@ namespace EarthRipperHook.Capture
                         })
                         .ToString();
 
-                    Dictionary<string, string> customShaders = [];
-                    foreach (string customShaderPath in Directory.EnumerateFiles(captureTemplateDirectory, "*.glsl"))
-                    {
-                        string shaderName = Path.GetFileNameWithoutExtension(customShaderPath);
-                        string shaderSource = File.ReadAllText(customShaderPath);
-                        customShaders[shaderName] = shaderSource;
-                    }
-
-                    yield return captureTask with { Path = path, CustomShaders = customShaders };
+                    validRenderPresetWasSpecified = true;
+                    yield return (renderPreset, outputPath);
                 }
+                else
+                {
+                    Log.Warning($"Render preset {renderPresetName} not found; ignoring...");
+                }
+            }
+
+            // If no valid render preset was specified, use the current one. We still need to reactivate/deactivate it
+            // in that case, as it may use custom shaders that rely on context-specific defines.
+            if (!validRenderPresetWasSpecified)
+            {
+                yield return (RenderPresetManager.GetCurrentRenderPreset(), saveImagePath);
             }
         }
 
-        private Dictionary<string, DisposableToken> _activeShaderOverrides = [];
-        private bool InvokeClickAndPerformCapture(nuint qAbstractButton, bool isChecked, CaptureTask captureTask)
+        private bool InvokeClickAndPerformCapture(nuint qAbstractButton, bool isChecked, RenderPresetDefinition renderPreset, string outputPath)
         {
-            foreach (var shaderOverride in _activeShaderOverrides.Values)
-            {
-                shaderOverride.Dispose();
-            }
-            _activeShaderOverrides.Clear();
-
-            Dictionary<int, bool> shouldDrawKnownShaders = [];
-
-            // Some shaders don't pass through igProgramAttr::bind(), so we don't know their names. In these cases we
-            // should only draw when all shaders are allowed, or when only specific (named) shaders are blocked.
-            bool shouldDrawUnknownShaders = captureTask.DefaultShaderHandling
-                is DefaultShaderHandling.AllowAll
-                or DefaultShaderHandling.BlockSpecified;
-            
             bool imageWasSaved = false;
 
             nuint OverrideSaveImagePath(nuint result, nuint parentWidget, nuint caption, nuint dir, nuint filter, nuint selectedFilter)
             {
-                QString pathAsQString = new QString(captureTask.Path);
+                QString pathAsQString = new QString(outputPath);
                 _allocatedQStrings.Enqueue(pathAsQString);
 
                 SuppressOriginal<QFileDialog.GetSaveFileName>(pathAsQString.NativeQStringData);
@@ -225,76 +180,9 @@ namespace EarthRipperHook.Capture
                 return result;
             }
 
-            bool OverrideBind(nuint igProgramAttr, nuint igVisualContext)
-            {
-                int shaderHandle = Original<IGProgramAttr.GetProgramHandle>()(igProgramAttr);
-                string shaderName = Original<IGProgramAttr.GetName>()(igProgramAttr).AsAnsiString();
-
-                if (captureTask.CustomShaders?.GetValueOrDefault(shaderName) is string customShaderSource)
-                {
-                    shouldDrawKnownShaders[shaderHandle] = true;
-
-                    if (!_activeShaderOverrides.ContainsKey(shaderName))
-                    {
-                        Log.Information("Overriding shader " + shaderName);
-                        var shaderOverride = ShaderHelper.OverrideShader(shaderName, customShaderSource);
-                        if (shaderOverride != null)
-                        {
-                            _activeShaderOverrides[shaderName] = shaderOverride;
-                        }
-                        else
-                        {
-                            Log.Error("Unable to override shader " + shaderName);
-                        }
-                    }
-                }
-                else
-                {
-                    shouldDrawKnownShaders[shaderHandle] = captureTask.DefaultShaderHandling switch
-                    {
-                        DefaultShaderHandling.AllowAll => true,
-                        DefaultShaderHandling.AllowSpecified => captureTask.DefaultShaders?.Contains(shaderName) is true,
-                        DefaultShaderHandling.BlockSpecified => captureTask.DefaultShaders?.Contains(shaderName) is false or null,
-                        DefaultShaderHandling.BlockAll => false,
-
-                        _ => throw new NotImplementedException()
-                    };
-                }
-
-                return default;
-            }
-
-            void OverrideClearColor(nuint igAttrContext, nuint igVec4f)
-            {
-                // The default clear color is a dark gray, but black makes more sense when capturing elevation.
-                Original<IGVec4f.Set>()(igVec4f, 0f, 0f, 0f, 0f);
-            }
-
-            void OverrideGenericDraw(nuint igOglVisualContext, int unknown1, int unknown2, int unknown3, int unknown4, int unknown5)
-            {
-                int shaderHandle = Original<IGOglVisualContext.GetCurrentProgramHandle>()(igOglVisualContext);
-                if (!shouldDrawKnownShaders.TryGetValue(shaderHandle, out bool shouldDraw))
-                {
-                    shouldDraw = shouldDrawUnknownShaders;
-                }
-
-                if (!shouldDraw)
-                {
-                    SuppressOriginal<IGOglVisualContext.GenericDraw>();
-                }
-            }
-
-            void OverrideRender(nuint qGraphicsView, nuint qPainter, nuint targetQRectF, nuint sourceQRect, int aspectRatioMode)
-            {
-                if (!captureTask.AllowImageOverlays)
-                {
-                    SuppressOriginal<QGraphicsView.Render>();
-                }
-            }
-
             bool OverrideSaveImage(nuint qImage, nuint fileName, string format, int quality)
             {
-                CaptureWriter.Write(captureTask, qImage, fileName, format, quality);
+                CaptureWriter.Write(renderPreset, qImage, fileName, format, quality);
 
                 SuppressOriginal<QImage.Save>(true);
                 imageWasSaved = true;
@@ -303,11 +191,6 @@ namespace EarthRipperHook.Capture
 
             try
             {
-                using var bindToken = Hook<IGProgramAttr.Bind>(OverrideBind, exclusive: false, throwOnFailure: true);
-
-                using var clearToken = Hook<IGAttrContext.SetClearColor>(OverrideClearColor, exclusive: true, throwOnFailure: true);
-                using var drawToken = Hook<IGOglVisualContext.GenericDraw>(OverrideGenericDraw, exclusive: true, throwOnFailure: true);
-                using var drawImageToken = Hook<QGraphicsView.Render>(OverrideRender, exclusive: true, throwOnFailure: true);
                 using var pathToken = Hook<QFileDialog.GetSaveFileName>(OverrideSaveImagePath, exclusive: true, throwOnFailure: true);
                 using var saveToken = Hook<QImage.Save>(OverrideSaveImage, exclusive: true, throwOnFailure: true);
 

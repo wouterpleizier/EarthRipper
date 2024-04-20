@@ -1,0 +1,7 @@
+﻿{
+  "ShowImageOverlays": false,
+  "DefaultShaderHandling": "BlockAll",
+  "ClearColor": [0.0, 0.0, 0.0],
+  "OutputPath": "{Directory}/{FileName}.elevation",
+  "OutputFormat": "PNG_Gray16",
+}

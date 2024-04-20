@@ -1,7 +1,0 @@
-﻿{
-  "Path": "{Directory}/{FileName}.color",
-  "Format": "JPG",
-  "Quality": 95,
-  "AllowImageOverlays": false,
-  "DefaultShaderHandling": "BlockAll",
-}

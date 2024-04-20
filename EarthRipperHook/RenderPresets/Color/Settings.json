@@ -1,0 +1,8 @@
+﻿{
+  "ShowImageOverlays": false,
+  "DefaultShaderHandling": "BlockAll",
+  "ClearColor": [0.0, 0.0, 0.0],
+  "OutputPath": "{Directory}/{FileName}.color",
+  "OutputFormat": "JPG",
+  "OutputQuality": 95,
+}

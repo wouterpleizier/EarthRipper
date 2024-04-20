@@ -1,0 +1,10 @@
+﻿{
+  "ShowImageOverlays": true,
+  "DefaultShaderHandling": "AllowAll",
+  "OutputPath": "{Directory}/{FileName}",
+  "OutputFormat": "UserSpecified",
+  "OutputQuality": 95,
+  "OutputScaleFactor": 1.0,
+  "OutputMaxWidth": 8192,
+  "OutputMaxHeight": 8192,
+}
