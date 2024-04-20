@@ -47,10 +47,6 @@ namespace EarthRipperHook.RenderPreset
             OriginalFragmentSource = fragmentSource;
             DesiredFragmentSource = fragmentSource;
 
-            // Initializing these when we first need them results in stack corruption, so do it here.
-            EnsureInitialized<IGProgramAttr.SetVertexSource>();
-            EnsureInitialized<IGProgramAttr.SetFragmentSource>();
-
             Hook<IGOglVisualContext.CompiledVertexShader>(UpdateVertexSource);
             Hook<IGOglVisualContext.CompiledFragmentShader>(UpdateFragmentSource);
         }

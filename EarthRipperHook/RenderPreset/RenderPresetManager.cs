@@ -44,6 +44,10 @@ namespace EarthRipperHook.RenderPreset
                 _renderPresets[RenderPresetDefinition.DefaultName] = RenderPresetDefinition.DefaultFallback;
             }
 
+            // Initializing these when we first need them results in stack corruption, so do it here.
+            EnsureInitialized<IGProgramAttr.SetVertexSource>();
+            EnsureInitialized<IGProgramAttr.SetFragmentSource>();
+
             Hook<IGProgramAttr.Bind>(InitializeShaderOnBind);
             Hook<IGAttrContext.SetClearColor>(OverrideClearColor);
             Hook<IGOglVisualContext.GenericDraw>(Suppress3DRendering);
