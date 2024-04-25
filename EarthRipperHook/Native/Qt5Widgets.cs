@@ -23,6 +23,10 @@
             [X86FunctionName("?setCheckable@QAction@@QAEX_N@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?setCheckable@QAction@@QEAAX_N@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate void SetCheckable(nuint qAction, bool checkable);
+
+            [X86FunctionName("?setChecked@QAction@@QAEX_N@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?setChecked@QAction@@QEAAX_N@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate void SetChecked(nuint qAction, bool isChecked);
         }
 
         internal static class QFileDialog
@@ -55,6 +59,14 @@
             [X86FunctionName("?addAction@QMenu@@QAEPAVQAction@@ABVQString@@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?addAction@QMenu@@QEAAPEAVQAction@@AEBVQString@@@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate nuint AddAction(nuint qMenu, nuint qString);
+
+            [X86FunctionName("?addMenu@QMenu@@QAEPAV1@ABVQString@@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?addMenu@QMenu@@QEAAPEAV1@AEBVQString@@@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate nuint AddMenu(nuint qMenu, nuint qString);
+
+            [X86FunctionName("?addSeparator@QMenu@@QAEPAVQAction@@XZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?addSeparator@QMenu@@QEAAPEAVQAction@@XZ"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate nuint AddSeparator(nuint qMenu);
         }
 
         internal static class QMenuBar
@@ -62,6 +74,13 @@
             [X86FunctionName("?addMenu@QMenuBar@@QAEPAVQMenu@@ABVQString@@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?addMenu@QMenuBar@@QEAAPEAVQMenu@@AEBVQString@@@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate nuint AddMenu(nuint qMenuBar, nuint qString);
+        }
+
+        internal static class QWidget
+        {
+            [X86FunctionName("?removeAction@QWidget@@QAEXPAVQAction@@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?removeAction@QWidget@@QEAAXPEAVQAction@@@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate void RemoveAction(nuint qWidget, nuint qAction);
         }
     }
 }

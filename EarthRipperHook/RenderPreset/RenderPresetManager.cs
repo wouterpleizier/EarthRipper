@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +13,16 @@ namespace EarthRipperHook.RenderPreset
 {
     internal static class RenderPresetManager
     {
+        internal delegate void RenderPresetEventHandler(RenderPresetDefinition renderPreset);
+        internal delegate void RenderPresetContextEventHandler(RenderPresetDefinition renderPreset, RenderPresetContext context);
+
+        internal static event RenderPresetEventHandler? RenderPresetAdded;
+        internal static event RenderPresetEventHandler? RenderPresetUpdated;
+        internal static event RenderPresetEventHandler? RenderPresetRemoved;
+        internal static event RenderPresetContextEventHandler? RenderPresetActivated;
+        internal static event RenderPresetContextEventHandler? RenderPresetApplied;
+        internal static event RenderPresetContextEventHandler? RenderPresetDeactivated;
+
         private static readonly object _lock = new object();
 
         private static readonly StringComparer _renderPresetNameComparer = StringComparer.OrdinalIgnoreCase;
@@ -20,11 +31,14 @@ namespace EarthRipperHook.RenderPreset
 
         private static readonly Dictionary<uint, Shader> _knownShaders = [];
 
+        private static RenderPresetPreviewer? _renderPresetPreviewer;
         private static JsonSerializerOptions? _jsonSerializerOptions;
         private static string? _renderPresetsDirectory;
 
         internal static void Initialize()
         {
+            _renderPresetPreviewer = new RenderPresetPreviewer();
+
             _jsonSerializerOptions = new JsonSerializerOptions() { AllowTrailingCommas = true };
             _jsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 
@@ -52,23 +66,6 @@ namespace EarthRipperHook.RenderPreset
             Hook<IGAttrContext.SetClearColor>(OverrideClearColor);
             Hook<IGOglVisualContext.GenericDraw>(Suppress3DRendering);
             Hook<QGraphicsView.Render>(SuppressImageOverlay);
-
-            // TODO: Move this to RenderPresetPreviewer or something
-            foreach (KeyValuePair<string, RenderPresetDefinition> pair in _renderPresets)
-            {
-                MenuManager.AddAction(pair.Key, (isChecked) =>
-                {
-                    RenderPresetDefinition? renderPreset = UpdateRenderPreset(pair.Key);
-                    if (renderPreset != null)
-                    {
-                        ActivateRenderPreset(renderPreset, RenderPresetContext.Preview);
-                    }
-                    else
-                    {
-                        DeactivateRenderPreset(RenderPresetContext.Preview);
-                    }
-                });
-            }
         }
 
         private static bool InitializeShaderOnBind(nuint igProgramAttr, nuint igVisualContext)
@@ -119,57 +116,81 @@ namespace EarthRipperHook.RenderPreset
 
         private static RenderPresetDefinition? UpdateRenderPreset(string name)
         {
-            if (_renderPresetsDirectory == null || string.IsNullOrEmpty(name))
+            lock (_lock)
             {
-                return null;
-            }
-
-            string directory = Path.Combine(_renderPresetsDirectory, name);
-            string settingsPath = Path.Combine(directory, "Settings.json");
-            
-            RenderPresetDefinition? renderPreset = null;
-            if (File.Exists(settingsPath))
-            {
-                try
+                if (_renderPresetsDirectory == null || string.IsNullOrEmpty(name))
                 {
-                    string json = File.ReadAllText(settingsPath);
-                    renderPreset = JsonSerializer.Deserialize<RenderPresetDefinition>(json, _jsonSerializerOptions);
+                    return null;
                 }
-                catch (Exception exception)
-                {
-                    Log.Error($"Unable to parse {settingsPath}");
-                    Log.Error(exception);
-                }
-            }
 
-            if (renderPreset != null)
-            {
-                foreach (string shaderPath in Directory.EnumerateFiles(directory, "*.glsl"))
+                string directory = Path.Combine(_renderPresetsDirectory, name);
+                string settingsPath = Path.Combine(directory, "Settings.json");
+
+                RenderPresetDefinition? previousRenderPreset = _renderPresets.GetValueOrDefault(name);
+                RenderPresetDefinition? renderPreset = null;
+                if (File.Exists(settingsPath))
                 {
-                    if (renderPreset.CustomShaders == null)
+                    try
                     {
-                        renderPreset = renderPreset with { CustomShaders = [] };
+                        string json = File.ReadAllText(settingsPath);
+                        renderPreset = JsonSerializer.Deserialize<RenderPresetDefinition>(json, _jsonSerializerOptions);
+                    }
+                    catch (Exception exception)
+                    {
+                        Log.Error($"Unable to parse {settingsPath}");
+                        Log.Error(exception);
+                    }
+                }
+
+                if (renderPreset != null)
+                {
+                    Dictionary<string, string> customShaders = renderPreset.CustomShaders?.ToDictionary() ?? [];
+                    foreach (string shaderPath in Directory.EnumerateFiles(directory, "*.glsl"))
+                    {
+                        string shaderName = Path.GetFileNameWithoutExtension(shaderPath);
+                        string shader = File.ReadAllText(shaderPath);
+                        customShaders[shaderName] = shader;
                     }
 
-                    string shaderName = Path.GetFileNameWithoutExtension(shaderPath);
-                    string shader = File.ReadAllText(shaderPath);
-                    renderPreset.CustomShaders[shaderName] = shader;
+                    renderPreset = renderPreset with
+                    {
+                        Name = name,
+                        CustomShaders = customShaders.ToImmutableDictionary()
+                    };
+
+                    _renderPresets[name] = renderPreset;
+                }
+                else
+                {
+                    _renderPresets.Remove(name);
                 }
 
-                _renderPresets[name] = renderPreset;
-            }
-            else
-            {
-                _renderPresets.Remove(name);
-            }
+                if (renderPreset != null && previousRenderPreset != null && !renderPreset.Equals(previousRenderPreset))
+                {
+                    RenderPresetUpdated?.Invoke(renderPreset);
+                }
+                else if (renderPreset != null && previousRenderPreset == null)
+                {
+                    RenderPresetAdded?.Invoke(renderPreset);
+                }
+                else if (renderPreset == null && previousRenderPreset != null)
+                {
+                    RenderPresetRemoved?.Invoke(previousRenderPreset);
+                }
 
-            return renderPreset;
+                return renderPreset;
+            }
         }
 
-        internal static RenderPresetDefinition? GetRenderPreset(string name)
+        internal static RenderPresetDefinition? GetRenderPreset(string name, bool forceUpdate = false)
         {
             lock (_lock)
             {
+                if (forceUpdate)
+                {
+                    UpdateRenderPreset(name);
+                }
+
                 return _renderPresets.GetValueOrDefault(name);
             }
         }
@@ -199,24 +220,36 @@ namespace EarthRipperHook.RenderPreset
             lock (_lock)
             {
                 _activeRenderPresets[context] = renderPreset;
-                ApplyCurrentRenderPreset();
             }
+
+            RenderPresetActivated?.Invoke(renderPreset, context);
+            ApplyCurrentRenderPreset();
         }
 
         internal static void DeactivateRenderPreset(RenderPresetContext context)
         {
+            RenderPresetDefinition? renderPreset = null;
             lock (_lock)
             {
-                _activeRenderPresets.Remove(context);
-                ApplyCurrentRenderPreset();
+                _activeRenderPresets.Remove(context, out renderPreset);
             }
+
+            if (renderPreset != null)
+            {
+                RenderPresetDeactivated?.Invoke(renderPreset, context);
+            }
+
+            ApplyCurrentRenderPreset();
         }
 
         private static void ApplyCurrentRenderPreset()
         {
+            RenderPresetDefinition renderPreset;
+            RenderPresetContext context;
+
             lock (_lock)
             {
-                RenderPresetDefinition definition = GetCurrentRenderPreset(out RenderPresetContext context);
+                renderPreset = GetCurrentRenderPreset(out context);
                 CultureInfo culture = CultureInfo.InvariantCulture;
                 string format = Shader.Defines.Format;
 
@@ -227,7 +260,7 @@ namespace EarthRipperHook.RenderPreset
 
                 foreach (Shader shader in _knownShaders.Values)
                 {
-                    if (definition?.CustomShaders?.GetValueOrDefault(shader.Name) is string customShaderSource)
+                    if (renderPreset.CustomShaders?.GetValueOrDefault(shader.Name) is string customShaderSource)
                     {
                         shader.DesiredVertexSource = new StringBuilder()
                             .AppendFormat(culture, format, Shader.Defines.VertexShader)
@@ -248,6 +281,8 @@ namespace EarthRipperHook.RenderPreset
                     }
                 }
             }
+
+            RenderPresetApplied?.Invoke(renderPreset, context);
         }
     }
 }

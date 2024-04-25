@@ -1,4 +1,5 @@
-﻿using Reloaded.Hooks.Definitions.Helpers;
+﻿using EarthRipperHook.Menus;
+using Reloaded.Hooks.Definitions.Helpers;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using static EarthRipperHook.Native.IGAttrs;
@@ -11,12 +12,13 @@ namespace EarthRipperHook.OrthoCamera
 
         public OrthoCameraHook()
         {
-            MenuManager.AddAction("Orthographic camera", ToggleOrthographicCamera, true);
+            MenuManager.MainMenu.AddSeparator();
+            MenuManager.MainMenu.AddAction("Orthographic camera", ToggleOrthographicCamera, true);
 
             Hook<IGProjectionMatrixAttr.SetMatrix>(HandleSetMatrix);
         }
 
-        private void ToggleOrthographicCamera(bool enable)
+        private void ToggleOrthographicCamera(MenuAction _, bool enable)
         {
             _enableOrthographicCamera = enable;
         }

@@ -1,4 +1,5 @@
 ﻿using EarthRipperHook.Capture;
+using EarthRipperHook.Menus;
 using EarthRipperHook.OrthoCamera;
 using EarthRipperHook.RenderPreset;
 using EarthRipperShared;
