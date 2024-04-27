@@ -136,6 +136,27 @@ namespace EarthRipper
                 is64Bit = false;
             }
 
+            // Wait for OpenSSL to load, as this indicates that the application has more or less finished launching.
+            bool waitingForModule = false;
+            while (!process.Modules.Cast<ProcessModule>().Any(module => module.ModuleName == "ssleay32.dll"))
+            {
+                if (!waitingForModule)
+                {
+                    Log.Information("Waiting for required modules to load...");
+                    waitingForModule = true;
+                }
+
+                Thread.Sleep(100);
+                process.Refresh();
+            }
+
+            // Need a bit of a delay here to ensure that various shaders have had a chance to compile and render. Not
+            // foolproof but it works on my machine™.
+            if (waitingForModule)
+            {
+                Thread.Sleep(1000);
+            }
+
             return process;
         }
 
