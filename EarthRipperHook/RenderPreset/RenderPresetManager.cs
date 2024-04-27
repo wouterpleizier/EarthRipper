@@ -93,14 +93,38 @@ namespace EarthRipperHook.RenderPreset
 
         private static void Suppress3DRendering(nuint igOglVisualContext, int unknown1, int unknown2, int unknown3, int unknown4, int unknown5)
         {
-            // Some shaders don't pass through igProgramAttr::bind(), so we don't know their names. In these cases we
-            // should only draw when all shaders are allowed, or when only specific (named) shaders are blocked.
-            bool shouldDrawUnknownShaders = GetCurrentRenderPreset().DefaultShaderHandling
-                is DefaultShaderHandling.AllowAll
-                or DefaultShaderHandling.BlockSpecified;
+            RenderPresetDefinition currentRenderPreset = GetCurrentRenderPreset();
 
+            bool shouldDraw;
             uint shaderHandle = (uint)Original<IGOglVisualContext.GetCurrentProgramHandle>()(igOglVisualContext);
-            if (!_knownShaders.ContainsKey(shaderHandle) && !shouldDrawUnknownShaders)
+            if (_knownShaders.TryGetValue(shaderHandle, out Shader? knownShader))
+            {
+                if (currentRenderPreset.CustomShaders?.ContainsKey(knownShader.Name) == true)
+                {
+                    shouldDraw = true;
+                }
+                else
+                {
+                    shouldDraw = currentRenderPreset.DefaultShaderHandling switch
+                    {
+                        DefaultShaderHandling.AllowAll => true,
+                        DefaultShaderHandling.AllowSpecified => currentRenderPreset.DefaultShaders?.Contains(knownShader.Name) is true,
+                        DefaultShaderHandling.BlockSpecified => currentRenderPreset.DefaultShaders?.Contains(knownShader.Name) is false or null,
+                        DefaultShaderHandling.BlockAll => false,
+                        _ => throw new NotImplementedException()
+                    };
+                }
+            }
+            else
+            {
+                // Some shaders don't pass through igProgramAttr::bind(), so we don't know their names. In these cases
+                // we should only draw when all shaders are allowed, or when only specific (named) shaders are blocked.
+                shouldDraw = currentRenderPreset.DefaultShaderHandling
+                    is DefaultShaderHandling.AllowAll
+                    or DefaultShaderHandling.BlockSpecified;
+            }
+
+            if (!shouldDraw)
             {
                 SuppressOriginal<IGOglVisualContext.GenericDraw>();
             }
