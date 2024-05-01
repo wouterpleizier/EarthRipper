@@ -136,7 +136,7 @@ namespace EarthRipperHook.Capture
             bool validRenderPresetWasSpecified = false;
             foreach (string renderPresetName in fileNameParts.Skip(1))
             {
-                if (RenderPresetManager.GetRenderPreset(renderPresetName) is RenderPresetDefinition renderPreset)
+                if (RenderPresetManager.GetRenderPreset(renderPresetName, true) is RenderPresetDefinition renderPreset)
                 {
                     string outputPath = new StringBuilder(renderPreset.OutputPath)
                         .Replace(RenderPresetDefinition.DirectoryIdentifier, baseDirectory)
