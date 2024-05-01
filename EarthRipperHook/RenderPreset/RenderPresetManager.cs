@@ -189,7 +189,8 @@ namespace EarthRipperHook.RenderPreset
                     _renderPresets.Remove(name);
                 }
 
-                if (renderPreset != null && previousRenderPreset != null && !renderPreset.Equals(previousRenderPreset))
+                if (renderPreset != null && previousRenderPreset != null
+                    && !RenderPresetDefinition.AreEqual(renderPreset, previousRenderPreset))
                 {
                     RenderPresetUpdated?.Invoke(renderPreset);
                 }
