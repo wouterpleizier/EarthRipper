@@ -178,7 +178,7 @@ namespace EarthRipperHook.RenderPreset
 
                     renderPreset = renderPreset with
                     {
-                        Name = name,
+                        Name = previousRenderPreset?.Name ?? name,
                         CustomShaders = customShaders.ToImmutableDictionary()
                     };
 
