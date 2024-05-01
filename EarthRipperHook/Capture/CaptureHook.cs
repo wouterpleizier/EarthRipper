@@ -66,6 +66,8 @@ namespace EarthRipperHook.Capture
                 {
                     try
                     {
+                        Log.Information($"Performing capture with render preset {renderPreset.Name}...");
+
                         RenderPresetManager.ActivateRenderPreset(renderPreset, RenderPresetContext.Capture);
                         InvokeClickAndPerformCapture(qAbstractButton, isChecked, renderPreset, outputPath);
                     }
@@ -217,8 +219,10 @@ namespace EarthRipperHook.Capture
             {
                 Log.Error("Capture failed:");
                 Log.Error(exception);
+                return false;
             }
 
+            Log.Information($"Capture complete");
             return imageWasSaved;
         }
     }

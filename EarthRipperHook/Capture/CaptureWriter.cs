@@ -88,8 +88,9 @@ namespace EarthRipperHook.Capture
             encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
 
             string outputPath = new QString(fileName).ToString();
+
+            Log.Information($"Writing capture to {outputPath}...");
             using FileStream fileStream = File.OpenWrite(outputPath);
-            
             encoder.Save(fileStream);
 
             return true;

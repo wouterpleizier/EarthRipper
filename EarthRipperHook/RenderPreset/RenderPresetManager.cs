@@ -192,14 +192,17 @@ namespace EarthRipperHook.RenderPreset
                 if (renderPreset != null && previousRenderPreset != null
                     && !RenderPresetDefinition.AreEqual(renderPreset, previousRenderPreset))
                 {
+                    Log.Information($"Render preset {renderPreset.Name} updated");
                     RenderPresetUpdated?.Invoke(renderPreset);
                 }
                 else if (renderPreset != null && previousRenderPreset == null)
                 {
+                    Log.Information($"Render preset {renderPreset.Name} added");
                     RenderPresetAdded?.Invoke(renderPreset);
                 }
                 else if (renderPreset == null && previousRenderPreset != null)
                 {
+                    Log.Information($"Render preset {previousRenderPreset.Name} removed");
                     RenderPresetRemoved?.Invoke(previousRenderPreset);
                 }
 
@@ -247,6 +250,7 @@ namespace EarthRipperHook.RenderPreset
                 _activeRenderPresets[context] = renderPreset;
             }
 
+            Log.Information($"Render preset {renderPreset.Name} activated ({context.ToString().ToLower()})");
             RenderPresetActivated?.Invoke(renderPreset, context);
             ApplyCurrentRenderPreset();
         }
