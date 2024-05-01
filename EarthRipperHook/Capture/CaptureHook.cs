@@ -162,6 +162,22 @@ namespace EarthRipperHook.Capture
             // in that case, as it may use custom shaders that rely on context-specific defines.
             if (!validRenderPresetWasSpecified)
             {
+                RenderPresetDefinition renderPreset = RenderPresetManager.GetCurrentRenderPreset();
+
+                string? providedExtension = Path.GetExtension(saveImagePath);
+                string? expectedExtension = renderPreset.OutputFormat switch
+                {
+                    OutputFormat.JPG => ".jpg",
+                    OutputFormat.PNG or OutputFormat.PNG_Gray16 => ".png",
+                    _ => null
+                };
+
+                if (expectedExtension != null && providedExtension != expectedExtension)
+                {
+                    Log.Warning($"File extension {providedExtension} is not allowed by render preset {renderPreset.Name}; using {expectedExtension} instead");
+                    saveImagePath = Path.ChangeExtension(saveImagePath, expectedExtension);
+                }
+
                 yield return (RenderPresetManager.GetCurrentRenderPreset(), saveImagePath);
             }
         }
