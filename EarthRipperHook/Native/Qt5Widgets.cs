@@ -38,7 +38,7 @@
 
         internal static class QGraphicsView
         {
-            [X86FunctionName("?render@QGraphicsView@@QAEXPAVQPainter@@ABVQRectF@@ABVQRect@@W4AspectRatioMode@Qt@@@Z"), X86Function(X86CallingConventions.Cdecl)]
+            [X86FunctionName("?render@QGraphicsView@@QAEXPAVQPainter@@ABVQRectF@@ABVQRect@@W4AspectRatioMode@Qt@@@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?render@QGraphicsView@@QEAAXPEAVQPainter@@AEBVQRectF@@AEBVQRect@@W4AspectRatioMode@Qt@@@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate void Render(nuint qGraphicsView, nuint qPainter, nuint targetQRectF, nuint sourceQRect, int aspectRatioMode);
         }
