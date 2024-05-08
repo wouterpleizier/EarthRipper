@@ -111,7 +111,7 @@ namespace EarthRipperHook.Menus
 
             if (actionEvent == qActionTrigger && _menuActions.TryGetValue(qAction, out MenuAction? action))
             {
-                InvokeAfterCompletion<QAction.Activate>(() =>
+                InvokeAfterCompletion<QAction.Activate>(_ =>
                 {
                     bool isChecked = Original<QAction.IsChecked>()(qAction);
                     action.Handler.Invoke(action, isChecked);

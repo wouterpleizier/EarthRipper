@@ -25,7 +25,7 @@ namespace EarthRipperHook
             return NativeDelegateProxy<TNativeDelegate>.SuppressOriginal(returnValue);
         }
 
-        internal static void InvokeAfterCompletion<TNativeDelegate>(Action action) where TNativeDelegate : Delegate
+        internal static void InvokeAfterCompletion<TNativeDelegate>(Action<object?> action) where TNativeDelegate : Delegate
         {
             NativeDelegateProxy<TNativeDelegate>.InvokeAfterCompletion(action);
         }

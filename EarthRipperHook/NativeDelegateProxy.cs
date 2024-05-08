@@ -198,7 +198,7 @@ namespace EarthRipperHook
             }
         }
 
-        internal static void InvokeAfterCompletion(Action action)
+        internal static void InvokeAfterCompletion(Action<object?> action)
         {
             lock (_lock)
             {
@@ -266,11 +266,11 @@ namespace EarthRipperHook
                     result = OriginalFunction.DynamicInvoke(args)!;
                 }
 
-                Queue<Action> postCompletionActions = new Queue<Action>(context.PostCompletionActions);
+                Queue<Action<object?>> postCompletionActions = new Queue<Action<object?>>(context.PostCompletionActions);
                 while (postCompletionActions.Count > 0)
                 {
-                    Action action = postCompletionActions.Dequeue();
-                    action.Invoke();
+                    Action<object?> action = postCompletionActions.Dequeue();
+                    action.Invoke(result);
                 }
 
                 return result;
@@ -285,7 +285,7 @@ namespace EarthRipperHook
         {
             internal int Version { get; set; }
             internal List<TNativeDelegate> Subscribers { get; set; } = [];
-            internal Queue<Action> PostCompletionActions { get; set; } = [];
+            internal Queue<Action<object?>> PostCompletionActions { get; set; } = [];
             internal bool SuppressOriginalFunction { get; set; }
             internal object? OverrideReturnValue { get; set; }
         }
