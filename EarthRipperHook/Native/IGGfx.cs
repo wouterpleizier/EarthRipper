@@ -3,8 +3,19 @@
     [FunctionLibrary("IGGfx.dll")]
     internal static class IGGfx
     {
+        /// <remarks>
+        /// Note: this type is not just used in OpenGL mode as its name suggests, but in DirectX mode too.
+        /// </remarks>
         internal static class IGOglVisualContext
         {
+            [X86FunctionName("?compileFragmentShader@igOglVisualContext@Gfx@Gap@@QAE_NIPBD@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?compileFragmentShader@igOglVisualContext@Gfx@Gap@@QEAA_NIPEBD@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate bool CompileFragmentShader(nuint igOglVisualContext, uint programHandle, nuint fragmentSource);
+
+            [X86FunctionName("?compileVertexShader@igOglVisualContext@Gfx@Gap@@QAE_NIPBD@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?compileVertexShader@igOglVisualContext@Gfx@Gap@@QEAA_NIPEBD@Z"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate bool CompileVertexShader(nuint igOglVisualContext, uint programHandle, nuint vertexSource);
+
             [X86FunctionName("?compiledFragmentShader@igOglVisualContext@Gfx@Gap@@QAE_NI@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?compiledFragmentShader@igOglVisualContext@Gfx@Gap@@QEAA_NI@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate bool CompiledFragmentShader(nuint igOglVisualContext, uint programHandle);

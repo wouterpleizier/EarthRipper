@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using Reloaded.Hooks.Definitions.Helpers;
+using System.Runtime.InteropServices;
 using static EarthRipperHook.Native.IGAttrs;
 using static EarthRipperHook.Native.IGGfx;
 
@@ -30,6 +31,8 @@ namespace EarthRipperHook.RenderPreset
         internal string DesiredFragmentSource { get; set; }
         private string _lastCompiledFragmentSource;
 
+        private string? _lastVertexSourceLog;
+
         internal Shader(nuint igProgramAttr, uint handle)
         {
             IGProgramAttr = igProgramAttr;
@@ -49,6 +52,8 @@ namespace EarthRipperHook.RenderPreset
 
             Hook<IGOglVisualContext.CompiledVertexShader>(UpdateVertexSource);
             Hook<IGOglVisualContext.CompiledFragmentShader>(UpdateFragmentSource);
+            Hook<IGOglVisualContext.CompileVertexShader>(CompileVertexSource);
+            Hook<IGOglVisualContext.CompileFragmentShader>(CompileFragmentSource);
         }
 
         private bool UpdateVertexSource(nuint igOglVisualContext, uint programHandle)
@@ -59,8 +64,6 @@ namespace EarthRipperHook.RenderPreset
                 nint ptr = Marshal.StringToHGlobalAnsi(DesiredVertexSource);
                 Original<IGProgramAttr.SetVertexSource>()(IGProgramAttr, ptr);
                 Marshal.FreeHGlobal(ptr);
-
-                _lastCompiledVertexSource = DesiredVertexSource;
 
                 SuppressOriginal<IGOglVisualContext.CompiledVertexShader>(false);
                 return false;
@@ -78,10 +81,91 @@ namespace EarthRipperHook.RenderPreset
                 Original<IGProgramAttr.SetFragmentSource>()(IGProgramAttr, ptr);
                 Marshal.FreeHGlobal(ptr);
 
-                _lastCompiledFragmentSource = DesiredFragmentSource;
-
                 SuppressOriginal<IGOglVisualContext.CompiledFragmentShader>(false);
                 return false;
+            }
+
+            return default;
+        }
+
+        private bool CompileVertexSource(nuint igOglVisualContext, uint programHandle, nuint vertexSource)
+        {
+            if (programHandle == Handle)
+            {
+                InvokeAfterCompletion<IGOglVisualContext.CompileVertexShader>(_ =>
+                {
+                    // CompileVertexShader appears to return true even when compilation has failed, so we'll rely on
+                    // InfoLog instead. This returns a pointer to the compilation log when errors have occurred, and
+                    // null otherwise. (Sadly, this also means that warnings aren't logged when no errors are present)
+
+                    nuint logPtr = Original<IGProgramAttr.InfoLog>()(IGProgramAttr);
+
+                    if (logPtr != nuint.Zero
+                        && Marshal.PtrToStringAnsi(logPtr.ToSigned()) is string log)
+                    {
+                        Log.Warning($"\nVertex shader of {Name} failed to compile:");
+                        foreach (string line in log.Split("\n"))
+                        {
+                            if (line.Contains("error", StringComparison.OrdinalIgnoreCase))
+                            {
+                                Log.Error(line);
+                            }
+                            else
+                            {
+                                Log.Warning(line);
+                            }
+                        }
+
+                        _lastVertexSourceLog = log;
+                        DesiredVertexSource = OriginalVertexSource;
+                    }
+                    else
+                    {
+                        _lastVertexSourceLog = null;
+                        _lastCompiledVertexSource = DesiredVertexSource;
+                    }
+                });
+            }
+
+            return default;
+        }
+
+        private bool CompileFragmentSource(nuint igOglVisualContext, uint programHandle, nuint vertexSource)
+        {
+            if (programHandle == Handle)
+            {
+                InvokeAfterCompletion<IGOglVisualContext.CompileFragmentShader>(_ =>
+                {
+                    nuint logPtr = Original<IGProgramAttr.InfoLog>()(IGProgramAttr);
+
+                    // Same as the vertex shader stage, but with an extra wrinkle: when vertex shader compilation fails
+                    // but fragment shader compilation succeeds, InfoLog returns the same error log. We don't need to
+                    // log it again in that case, but we should probably still revert to the original source.
+                    if (logPtr != nuint.Zero && Marshal.PtrToStringAnsi(logPtr.ToSigned()) is string log)
+                    {
+                        if (log != _lastVertexSourceLog)
+                        {
+                            Log.Warning($"\nFragment shader of {Name} failed to compile:");
+                            foreach (string line in log.Split("\n"))
+                            {
+                                if (line.Contains("error", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Log.Error(line);
+                                }
+                                else
+                                {
+                                    Log.Warning(line);
+                                }
+                            }
+                        }
+
+                        DesiredFragmentSource = OriginalFragmentSource;
+                    }
+                    else
+                    {
+                        _lastCompiledFragmentSource = DesiredFragmentSource;
+                    }
+                });
             }
 
             return default;

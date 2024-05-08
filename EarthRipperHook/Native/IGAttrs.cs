@@ -40,6 +40,10 @@
             [X64FunctionName("?getVertexSource@igProgramAttr@Attrs@Gap@@QEBAPEBDXZ"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate nuint GetVertexSource(nuint igProgramAttr);
 
+            [X86FunctionName("?infoLog@igProgramAttr@Attrs@Gap@@QAEPBDXZ"), X86Function(X86CallingConventions.MicrosoftThiscall)]
+            [X64FunctionName("?infoLog@igProgramAttr@Attrs@Gap@@QEAAPEBDXZ"), X64Function(X64CallingConventions.Microsoft)]
+            internal delegate nuint InfoLog(nuint igProgramAttr);
+
             [X86FunctionName("?setFragmentSource@igProgramAttr@Attrs@Gap@@QAEXPBD@Z"), X86Function(X86CallingConventions.MicrosoftThiscall)]
             [X64FunctionName("?setFragmentSource@igProgramAttr@Attrs@Gap@@QEAAXPEBD@Z"), X64Function(X64CallingConventions.Microsoft)]
             internal delegate void SetFragmentSource(nuint igProgramAttr, nint source);
