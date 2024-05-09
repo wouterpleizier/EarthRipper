@@ -21,16 +21,16 @@ namespace EarthRipperHook.Capture
 
         private static void PatchMaximumCaptureSize()
         {
-            // The render destination for saving images is clamped to 5000x5000 pixels by default, and images larger
-            // than this are rendered in parts. For example, when the desired image size is 8192x4096, a 5000x4096
-            // region is first rendered, followed by the remaining 3192x4096 region. This works fine normally, but we
-            // may be using custom shaders that cause geometry to render differently (e.g. with an elevation of 0) than
-            // what the frustrum culler anticipated. This can then lead to map tiles disappearing near the borders of
-            // each render region.
+            // By default, the render destination for saving images is clamped to 5000x5000 in OpenGL mode and 1024x1024
+            // in DirectX mode. Images larger than this are rendered in parts. For example, when the desired image size
+            // in OpenGL mode is 8192x4096, a 5000x4096 region is first rendered, followed by the remaining 3192x4096
+            // region. This works fine normally, but we may be using custom shaders that cause geometry to render
+            // differently (e.g. with an elevation of 0) than what the frustrum culler anticipated. This can then lead
+            // to map tiles disappearing near the borders of each render region.
 
-            // The code below initializes the maximum and minimum values that are provided to the clamping function
-            // before the render destination is created. We'll change the maximum value from 5000 to 8192 (the current
-            // maximum image size), effectively causing all captures to render in a single pass.
+            // The code below initializes the maximum values for each mode before the render destination is created.
+            // We'll change these values to 8192 (the current maximum image size), effectively causing all captures to
+            // render in a single pass.
 
             if (nuint.Size == 4)
             {
@@ -41,7 +41,7 @@ namespace EarthRipperHook.Capture
                 ],
                 [
                     0xc7, 0x45, 0xe4, 0x00, 0x20, 0x00, 0x00, // mov dword ptr [ebp-0x1c], 0x2000 (8192)
-                    0xc7, 0x45, 0xe0, 0x00, 0x04, 0x00, 0x00, // mov dword ptr [ebp-0x20], 0x0400 (1024)
+                    0xc7, 0x45, 0xe0, 0x00, 0x20, 0x00, 0x00, // mov dword ptr [ebp-0x20], 0x2000 (8192)
                 ]);
             }
             else
@@ -53,7 +53,7 @@ namespace EarthRipperHook.Capture
                 ],
                 [
                     0xc7, 0x44, 0x24, 0x34, 0x00, 0x20, 0x00, 0x00, // mov dword ptr [rsp+34], 0x2000 (8192)
-                    0xc7, 0x44, 0x24, 0x38, 0x00, 0x04, 0x00, 0x00, // mov dword ptr [rsp+38], 0x0400 (1024)
+                    0xc7, 0x44, 0x24, 0x38, 0x00, 0x20, 0x00, 0x00, // mov dword ptr [rsp+38], 0x2000 (8192)
                 ]);
             }
         }
