@@ -5,7 +5,6 @@ Tool for ripping high-resolution imagery and heightmaps from Google Earth Pro.
 - **This tool is not affiliated with Google and is only intended for personal use. Images captured with the tool may be subject to copyright and should not be considered a valid replacement for DEM data.**
 - Supports version 7.3.6 of Google Earth Pro for Windows only (the desktop application, not the web-based Google Earth!). Other Windows versions may also work to some degree but have not been tested. [Installers for specific versions can be found here.](https://support.google.com/earth/answer/168344#zippy=%2Cdownload-a-google-earth-pro-direct-installer)
 - Supports both 32-bit and 64-bit, but 64-bit is recommended (especially for high-resolution captures).
-- Supports OpenGL mode only.
 - Captures use a spherical projection (same as how Google Earth renders normally, except with nullified elevation). This means that the more you zoom out, the more the outer edges of the capture will be distorted by the Earth's curvature.
 - Captures can only be saved as images (JPG, 24-bit color PNG or 16-bit grayscale PNG) with a resolution of up to 8192x8192 pixels. If you need 3D geometry, try one of the following methods instead:
 	- [Google's official Map Tiles API](https://developers.google.com/maps/documentation/tile), optionally via [Blosm for Blender](https://github.com/vvoovv/blosm/wiki/Import-of-Google-3D-Cities)
@@ -38,14 +37,12 @@ An orthographic camera can be toggled via a menu option. This usually isn't nece
 	- **Atmosphere**: `on`
 	- **Sun**: `off`
 3. Open the `Tools` menu, click `Options...` and set these options as follows:
-	- **Graphics Mode**: `OpenGL`
 	- **Elevation Exaggeration**: `1`
 	- **Use photorealistic atmosphere rendering (EXPERIMENTAL)**: `on`
 4. Close Google Earth Pro.
 5. Download the latest version of EarthRipper from https://github.com/wouterpleizier/EarthRipper/releases/latest
 6. Extract the contents of the zip file to a new folder somewhere, then launch `EarthRipper.exe`.
 7. Google Earth Pro should now launch automatically, and EarthRipper will inject itself into the process when ready. A new menu titled `EarthRipper` should then appear in the upper menu bar of Google Earth Pro, next to the `Help` menu: <br> <br> ![menu](https://github.com/wouterpleizier/EarthRipper/assets/8166218/07018f66-ce9e-4137-9f54-b21c00dfa0af)
-
 
 If something looks wrong or doesn't work as expected (e.g. Google Earth Pro doesn't launch automatically or the map view remains black), launch Google Earth Pro manually, wait for it to finish loading and then run `EarthRipper.exe`.
 
@@ -133,5 +130,7 @@ watersurface
 Different shaders are used for different purposes. The `Color`, `Elevation` and `Tiles` render presets all override the `earth_atmosphere_ground_sun_on` shader because it has the necessary attributes and uniforms for determining and/or nullifying elevation. If you want to write a shader override from scratch, use these existing overrides as a reference. I also recommend examining the original shader source files in your `Google Earth Pro\client\shaders` folder and using [apitrace](https://apitrace.github.io/) or a similar tool to see what's happening under the hood.
 
 The vertex and fragment shader source are both expected to be contained in the same `.glsl` file. Use the `GE_VERTEX_SHADER` and `GE_PIXEL_SHADER` constants to differentiate between the two.
+
+When Google Earth Pro is running in DirectX mode, GLSL code is automatically transpiled to HLSL (same as with the built-in shaders). Be aware that certain language functions/features may work in one mode, but fail to compile in the other.
 
 For render presets that output 16-bit grayscale PNGs, shader overrides should pack their data into the red and green channels of `gl_FragColor`. You can optionally use the `EARTHRIPPER_CAPTURE` constant to do this only when saving images, and to return a more user-friendly color in other cases. Check the `Elevation` render preset for an example.
