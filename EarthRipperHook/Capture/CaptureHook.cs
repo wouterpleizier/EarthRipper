@@ -123,6 +123,11 @@ namespace EarthRipperHook.Capture
 
         private static IEnumerable<(RenderPresetDefinition renderPreset, string outputPath)> GetCaptureTasks(string saveImagePath)
         {
+            if (string.IsNullOrEmpty(saveImagePath))
+            {
+                yield break;
+            }
+
             string[] fileNameParts = Path.GetFileNameWithoutExtension(saveImagePath)
                 .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
