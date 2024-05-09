@@ -28,7 +28,11 @@ namespace EarthRipperHook.RenderPreset
         private void HandleRenderPresetAdded(RenderPresetDefinition renderPreset)
         {
             string name = renderPreset.Name;
-            if (name != RenderPresetDefinition.DefaultName)
+            if (name.Equals(RenderPresetDefinition.DefaultName, StringComparison.OrdinalIgnoreCase))
+            {
+                RenderPresetManager.ActivateRenderPreset(renderPreset, RenderPresetContext.Preview);
+            }
+            else
             {
                 MenuAction action = _renderPresetsMenu.AddAction(name, HandleRenderPresetAction, checkable: true);
                 _renderPresetActions[renderPreset.Name] = action;
