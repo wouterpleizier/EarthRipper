@@ -154,7 +154,7 @@ namespace EarthRipper
             // foolproof but it works on my machine™.
             if (waitingForModule)
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(2000);
             }
 
             return process;
